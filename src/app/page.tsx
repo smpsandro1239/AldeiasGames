@@ -87,22 +87,311 @@ import {
   FileText
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { AdminDashboardView } from '@/features/admin/AdminDashboardView';
-import { VendedorDashboardView } from '@/features/vendedor/VendedorDashboardView';
-import { PublicGamesView } from '@/features/public/PublicGamesView';
-import { PlayerParticipationsView } from '@/features/player/PlayerParticipationsView';
-import { useAuthLogic } from '@/hooks/use-auth-logic';
-import { useDashboardData } from '@/hooks/use-dashboard-data';
 import type { User, Jogo, Participacao, Aldeia, Evento } from '@/types/project';
 import { GameCardSkeleton, EmptyState } from '@/components/common-ui';
 import { NotificacoesModal } from '@/components/notificacoes-modal';
 import { ScratchCard } from '@/components/scratch-card';
-import { FundingGoal } from '@/components/funding-goal';
 import { RifaNumberSelector } from '@/components/rifa-number-selector';
+import { FundingGoal } from '@/components/funding-goal';
+import { AdminDashboardView } from '@/features/admin/AdminDashboardView';
+import { VendedorDashboardView } from '@/features/vendedor/VendedorDashboardView';
+import { PublicGamesView } from '@/features/public/PublicGamesView';
+import { PlayerParticipationsView } from '@/features/player/PlayerParticipationsView';
+import { AuthModal } from '@/components/modals/AuthModal';
+import { ParticiparModal } from '@/components/modals/ParticiparModal';
+import { CreateModal } from '@/components/modals/CreateModal';
+import { WizardModal } from '@/components/modals/WizardModal';
 
-// Types
+// Skeleton Components
+const GameCardSkeleton = () => (
+  <Card className="overflow-hidden">
+    <div className="h-2 bg-gradient-to-r from-green-400 to-green-600" />
+    <CardHeader>
+      <div className="flex justify-between items-start">
+        <div className="space-y-2 flex-1">
+          <Skeleton className="h-6 w-32" />
+          <Skeleton className="h-4 w-48" />
+        </div>
+        <Skeleton className="h-6 w-16 rounded-full" />
+      </div>
+    </CardHeader>
+    <CardContent>
+      <Skeleton className="h-24 w-full" />
+    </CardContent>
+    <CardFooter>
+      <Skeleton className="h-10 w-full" />
+    </CardFooter>
+  </Card>
+);
+
+// Empty State Component
+const EmptyState = ({
+  icon: Icon,
+  title,
+  description,
+  action
+}: {
+  icon: React.ElementType;
+  title: string;
+  description: string;
+  action?: React.ReactNode;
+}) => (
+  <motion.div
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    className="flex flex-col items-center justify-center py-16"
+  >
+    <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mb-4">
+      <Icon className="h-10 w-10 text-muted-foreground" />
+    </div>
+    <h3 className="text-xl font-semibold mb-2">{title}</h3>
+    <p className="text-muted-foreground text-center max-w-md mb-4">{description}</p>
+    {action}
+  </motion.div>
+);
+
 // Scratch Card Component - Real Scratch Effect with Canvas
+const ScratchCard = ({
+  participacaoId,
+  numeroCartao,
+  isRevelada,
+  isRevelando,
+  resultado,
+  onReveal
+}: {
+  participacaoId: string;
+  numeroCartao: number;
+  isRevelada: boolean;
+  isRevelando: boolean;
+  resultado: any;
+  onReveal: (id: string) => void;
+}) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isScratching, setIsScratching] = useState(false);
+  const [scratchProgress, setScratchProgress] = useState(0);
+  const [showResult, setShowResult] = useState(false);
+  const isWinner = resultado?.isWinner;
 
+  // Initialize canvas with scratch layer
+  useEffect(() => {
+    if (isRevelada || isRevelando) return;
+
+    const canvas = canvasRef.current;
+    const container = containerRef.current;
+    if (!canvas || !container) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Set canvas size to match container
+    const rect = container.getBoundingClientRect();
+    canvas.width = rect.width;
+    canvas.height = rect.height;
+
+    // Draw scratch layer (golden/silver gradient)
+    const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+    gradient.addColorStop(0, '#f59e0b');
+    gradient.addColorStop(0.5, '#fbbf24');
+    gradient.addColorStop(1, '#f59e0b');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Add texture pattern
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+    for (let i = 0; i < 50; i++) {
+      const x = Math.random() * canvas.width;
+      const y = Math.random() * canvas.height;
+      const size = Math.random() * 3 + 1;
+      ctx.beginPath();
+      ctx.arc(x, y, size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Add text instruction
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+    ctx.font = `bold ${Math.max(14, canvas.width / 12)}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('RASPE AQUI', canvas.width / 2, canvas.height / 2 - 10);
+    ctx.font = `${Math.max(10, canvas.width / 16)}px sans-serif`;
+    ctx.fillText('✨', canvas.width / 2, canvas.height / 2 + 15);
+  }, [isRevelada, isRevelando]);
+
+  // Handle scratch
+  const handleScratch = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    if (isRevelada || isRevelando) return;
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const rect = canvas.getBoundingClientRect();
+    let x, y;
+
+    if ('touches' in e) {
+      x = e.touches[0].clientX - rect.left;
+      y = e.touches[0].clientY - rect.top;
+    } else {
+      x = e.clientX - rect.left;
+      y = e.clientY - rect.top;
+    }
+
+    // Erase scratch layer
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.beginPath();
+    ctx.arc(x, y, 25, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Calculate progress
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const pixels = imageData.data;
+    let transparent = 0;
+    for (let i = 3; i < pixels.length; i += 4) {
+      if (pixels[i] < 128) transparent++;
+    }
+    const progress = (transparent / (pixels.length / 4)) * 100;
+    setScratchProgress(progress);
+
+    // Auto-reveal when 50% scratched
+    if (progress > 50 && !isScratching) {
+      setIsScratching(true);
+      onReveal(participacaoId);
+    }
+  }, [isRevelada, isRevelando, isScratching, participacaoId, onReveal]);
+
+  // Show result animation
+  useEffect(() => {
+    if (isRevelada && resultado) {
+      setTimeout(() => setShowResult(true), 100);
+    }
+  }, [isRevelada, resultado]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className={cn(
+        "relative rounded-xl overflow-hidden border-2 transition-all",
+        isRevelada && isWinner ? "border-yellow-500 shadow-lg shadow-yellow-200 dark:shadow-yellow-900/50" : "border-gray-200 dark:border-gray-700",
+        !isRevelada && !isRevelando && "hover:border-amber-400 hover:shadow-lg cursor-pointer"
+      )}
+    >
+      {/* Card Number Badge */}
+      <div className="absolute top-2 left-2 z-20">
+        <Badge className="bg-black/70 text-white text-xs">
+          #{numeroCartao}
+        </Badge>
+      </div>
+
+      {/* Scratch Area */}
+      <div
+        ref={containerRef}
+        className="relative aspect-[3/4] w-full"
+      >
+        {/* Background Result Layer */}
+        <div className={cn(
+          "absolute inset-0 flex flex-col items-center justify-center p-3",
+          isRevelada && isWinner
+            ? "bg-gradient-to-br from-yellow-100 via-amber-50 to-yellow-100 dark:from-yellow-900/50 dark:via-amber-900/30 dark:to-yellow-900/50"
+            : isRevelada
+              ? "bg-gradient-to-br from-gray-100 via-slate-50 to-gray-100 dark:from-gray-800 dark:via-gray-900 dark:to-gray-800"
+              : "bg-gradient-to-br from-amber-400 to-orange-500"
+        )}>
+          {/* Revealed Content */}
+          {isRevelada && showResult ? (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.5 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ type: "spring", bounce: 0.5 }}
+              className="text-center"
+            >
+              {isWinner ? (
+                <>
+                  <motion.div
+                    initial={{ scale: 0, rotate: -180 }}
+                    animate={{ scale: 1, rotate: 0 }}
+                    transition={{ type: "spring", bounce: 0.3 }}
+                  >
+                    <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-yellow-300 to-amber-400 rounded-full flex items-center justify-center mb-2 mx-auto shadow-lg">
+                      <Trophy className="h-8 w-8 sm:h-10 sm:w-10 text-yellow-800" />
+                    </div>
+                  </motion.div>
+                  <p className="text-yellow-800 dark:text-yellow-200 font-bold text-lg sm:text-xl mb-1">🎉 GANHOU!</p>
+                  <p className="text-yellow-700 dark:text-yellow-300 font-semibold text-sm sm:text-base">{resultado?.premio?.nome}</p>
+                  <Badge className="bg-yellow-500 text-white mt-2 text-base sm:text-lg px-3 py-1">
+                    {resultado?.premio?.valor}€
+                  </Badge>
+                </>
+              ) : (
+                <>
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 bg-gray-300 dark:bg-gray-600 rounded-full flex items-center justify-center mb-2 mx-auto">
+                    <span className="text-3xl sm:text-4xl">😔</span>
+                  </div>
+                  <p className="text-gray-600 dark:text-gray-300 font-bold text-base sm:text-lg mb-1">Sem prémio</p>
+                  <p className="text-gray-500 dark:text-gray-400 text-xs sm:text-sm">Mais sorte na próxima!</p>
+                </>
+              )}
+            </motion.div>
+          ) : isRevelando ? (
+            <div className="flex flex-col items-center gap-2">
+              <Loader2 className="h-8 w-8 animate-spin text-white" />
+              <p className="text-white text-sm">A revelar...</p>
+            </div>
+          ) : !isRevelada ? (
+            <>
+              <div className="w-12 h-12 sm:w-16 sm:h-16 bg-white/20 rounded-full flex items-center justify-center mb-2 mx-auto">
+                <Sparkles className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
+              </div>
+              <p className="text-white font-bold text-base sm:text-lg mb-1">Raspadinha</p>
+              <p className="text-white/80 text-xs sm:text-sm">Raspe para revelar!</p>
+            </>
+          ) : null}
+        </div>
+
+        {/* Canvas Scratch Layer */}
+        {!isRevelada && !isRevelando && (
+          <canvas
+            ref={canvasRef}
+            className="absolute inset-0 w-full h-full touch-none"
+            onMouseDown={() => setIsScratching(true)}
+            onMouseUp={() => setIsScratching(false)}
+            onMouseLeave={() => setIsScratching(false)}
+            onMouseMove={isScratching ? handleScratch : undefined}
+            onTouchStart={() => setIsScratching(true)}
+            onTouchEnd={() => setIsScratching(false)}
+            onTouchMove={handleScratch}
+          />
+        )}
+      </div>
+
+      {/* Verification Badge */}
+      {isRevelada && (
+        <div className="absolute bottom-2 right-2 z-10">
+          <Badge variant="outline" className="text-xs bg-white/90 dark:bg-gray-800/90">
+            <Shield className="h-3 w-3 mr-1" />
+            Verificado
+          </Badge>
+        </div>
+      )}
+
+      {/* Progress indicator */}
+      {!isRevelada && !isRevelando && scratchProgress > 0 && (
+        <div className="absolute bottom-2 left-2 right-2 z-10">
+          <div className="h-1 bg-gray-300/50 rounded-full overflow-hidden">
+            <motion.div
+              className="h-full bg-white"
+              initial={{ width: 0 }}
+              animate={{ width: `${scratchProgress}%` }}
+            />
+          </div>
+        </div>
+      )}
+    </motion.div>
+  );
+};
 
 // Game Type Config
 const GAME_TYPES = {
@@ -2906,7 +3195,1609 @@ export default function DashboardPage() {
   // Rifa Numbers is now handled by RifaNumberSelector component
 
   // Main Render
+  const renderPublicGames = () => (
+    <motion.div
+      className="space-y-6"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+    >
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-bold flex items-center gap-2">
+            <Globe className="h-6 w-6 text-green-600" />
+            Jogos Disponíveis
+          </h2>
+          <p className="text-muted-foreground">Participe em jogos de aldeias de todo o mundo</p>
+        </div>
+        <Badge variant="secondary" className="text-sm">
+          {jogosPublicos.filter(j => j.estado === 'ativo').length} jogos ativos
+        </Badge>
+      </div>
 
+      {loading ? (
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <GameCardSkeleton />
+          <GameCardSkeleton />
+          <GameCardSkeleton />
+        </div>
+      ) : jogosPublicos.length === 0 ? (
+        <EmptyState
+          icon={Gamepad2}
+          title="Sem jogos disponíveis"
+          description="Não há jogos ativos no momento. Volte em breve!"
+        />
+      ) : (
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {jogosPublicos.map((jogo, index) => {
+            const gameType = GAME_TYPES[jogo.tipo as keyof typeof GAME_TYPES] || GAME_TYPES.rifa;
+            const config = typeof jogo.config === 'string' ? JSON.parse(jogo.config) : jogo.config;
+
+            return (
+              <motion.div
+                key={jogo.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1 }}
+              >
+                <Card className={cn(
+                  "overflow-hidden hover:shadow-xl transition-all duration-300 group",
+                  jogo.estado === 'terminado' && "opacity-75"
+                )}>
+                  <div className={cn(
+                    "h-2",
+                    jogo.estado === 'ativo' ? "bg-gradient-to-r from-green-400 to-green-600" :
+                    jogo.estado === 'terminado' ? "bg-gradient-to-r from-gray-400 to-gray-600" :
+                    "bg-gradient-to-r from-yellow-400 to-yellow-600"
+                  )} />
+
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle className="flex items-center gap-2">
+                          <span className="text-2xl">{gameType.emoji}</span>
+                          <span className="capitalize">{jogo.tipo.replace('_', ' ')}</span>
+                        </CardTitle>
+                        <CardDescription className="flex items-center gap-1 mt-1">
+                          <MapPin className="h-3 w-3" />
+                          {jogo.evento?.aldeia?.nome || 'Aldeia'} • {jogo.evento?.nome || 'Evento'}
+                        </CardDescription>
+                      </div>
+                      <Badge variant={jogo.estado === 'ativo' ? 'default' : 'secondary'}>
+                        {jogo.estado}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+
+                  <CardContent className="space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                      {gameType.description}
+                    </p>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="p-3 bg-muted/50 rounded-lg text-center">
+                        <p className="text-xs text-muted-foreground">Preço</p>
+                        <p className="text-lg font-bold text-green-600">{jogo.precoParticipacao}€</p>
+                      </div>
+                      <div className="p-3 bg-muted/50 rounded-lg text-center">
+                        <p className="text-xs text-muted-foreground">Participações</p>
+                        <p className="text-lg font-bold">{jogo._count?.participacoes || 0}</p>
+                      </div>
+                    </div>
+
+                    {/* Prémio */}
+                    {jogo.premio && (
+                      <div className="p-3 bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950 dark:to-yellow-950 rounded-lg border border-amber-200 dark:border-amber-800">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Gift className="h-4 w-4 text-amber-600" />
+                          <span className="text-sm font-semibold text-amber-700 dark:text-amber-300">Prémio</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          {jogo.premio.imagemBase64 ? (
+                            <img
+                              src={jogo.premio.imagemBase64}
+                              alt={jogo.premio.nome}
+                              className="w-12 h-12 object-cover rounded-lg border border-amber-200"
+                            />
+                          ) : (
+                            <div className="w-12 h-12 bg-amber-100 dark:bg-amber-900 rounded-lg flex items-center justify-center">
+                              <Gift className="h-6 w-6 text-amber-500" />
+                            </div>
+                          )}
+                          <div className="flex-1">
+                            <p className="font-medium text-sm">{jogo.premio.nome}</p>
+                            {jogo.premio.valorEstimado && (
+                              <p className="text-xs text-amber-600 dark:text-amber-400">
+                                Valor: {jogo.premio.valorEstimado.toFixed(2)}€
+                              </p>
+                            )}
+                            {jogo.premio.patrocinador && (
+                              <p className="text-xs text-muted-foreground">
+                                Patrocinado por: {jogo.premio.patrocinador}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {jogo.estado === 'terminado' && jogo.sorteio && (
+                      <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <p className="text-sm font-medium text-yellow-800 flex items-center gap-2">
+                          <Trophy className="h-4 w-4" />
+                          Vencedor: {JSON.stringify(jogo.sorteio.resultado)}
+                        </p>
+                      </div>
+                    )}
+
+                    {jogo.tipo === 'poio_vaca' && (
+                      <div className="text-xs text-muted-foreground">
+                        Grid: {config.linhas || 10}×{config.colunas || 10} = {(config.linhas || 10) * (config.colunas || 10)} coordenadas
+                      </div>
+                    )}
+                    {jogo.tipo === 'rifa' && (
+                      <div className="text-xs text-muted-foreground">
+                        {config.totalBilhetes || 100} números disponíveis
+                      </div>
+                    )}
+                  </CardContent>
+
+                  <CardFooter className="gap-2">
+                    {jogo.estado === 'ativo' ? (
+                      <>
+                        <Button
+                          className="flex-1 gap-2"
+                          onClick={() => openParticiparModal(jogo)}
+                        >
+                          <Play className="h-4 w-4" />
+                          Participar
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => setJogoDetalhe(jogo)}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCopyLink('jogo', jogo);
+                          }}
+                          title="Partilhar jogo"
+                        >
+                          <Share2 className="h-4 w-4" />
+                        </Button>
+                      </>
+                    ) : (
+                      <div className="flex w-full gap-2">
+                        <Button
+                          variant="outline"
+                          className="flex-1"
+                          onClick={() => setJogoDetalhe(jogo)}
+                        >
+                          <Eye className="h-4 w-4 mr-2" />
+                          Ver Detalhes
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCopyLink('jogo', jogo);
+                          }}
+                          title="Partilhar jogo"
+                        >
+                          <Share2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
+                  </CardFooter>
+                </Card>
+              </motion.div>
+            );
+          })}
+        </div>
+      )}
+    </motion.div>
+  );
+
+  const renderMyGames = () => (
+    <motion.div
+      className="space-y-6"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+    >
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-bold flex items-center gap-2">
+            <Ticket className="h-6 w-6 text-green-600" />
+            Minhas Participações
+          </h2>
+          <p className="text-muted-foreground">Veja todos os jogos onde participou</p>
+        </div>
+      </div>
+
+      {!user ? (
+        <EmptyState
+          icon={Users}
+          title="Inicie sessão"
+          description="Faça login para ver as suas participações"
+          action={<Button onClick={() => setAuthModalOpen(true)}>Entrar</Button>}
+        />
+      ) : minhasParticipacoes.length === 0 ? (
+        <EmptyState
+          icon={Ticket}
+          title="Sem participações"
+          description="Ainda não participou em nenhum jogo. Explore os jogos disponíveis!"
+          action={<Button onClick={() => setActiveView('public')}>Ver Jogos</Button>}
+        />
+      ) : (
+        <div className="grid gap-4">
+          {minhasParticipacoes.map((part, index) => {
+            const gameType = GAME_TYPES[part.jogo?.tipo as keyof typeof GAME_TYPES] || GAME_TYPES.rifa;
+            const isWinner = part.jogo?.sorteio &&
+              JSON.stringify(part.jogo.sorteio.resultado) === JSON.stringify(part.dadosParticipacao);
+
+            return (
+              <motion.div
+                key={part.id}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: index * 0.1 }}
+              >
+                <Card className={cn(
+                  "hover:shadow-lg transition-all",
+                  isWinner && "ring-2 ring-yellow-500 bg-yellow-50"
+                )}>
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center text-2xl relative">
+                          {gameType.emoji}
+                          {/* Círculo indicando que o número foi jogado */}
+                          <div className="absolute inset-0 border-4 border-green-500 rounded-full animate-pulse opacity-50" />
+                        </div>
+                        <div>
+                          <p className="font-semibold capitalize">{part.jogo?.tipo?.replace('_', ' ')}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {part.jogo?.evento?.aldeia?.nome} • {part.jogo?.evento?.nome}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(part.createdAt).toLocaleDateString('pt-PT')}
+                          </p>
+                          {/* Info do cliente se registado por admin */}
+                          {part.nomeCliente && (
+                            <p className="text-xs text-blue-600 mt-1 flex items-center gap-1">
+                              <Users className="h-3 w-3" />
+                              {part.nomeCliente}
+                              {part.telefoneCliente && <span>• {part.telefoneCliente}</span>}
+                              {part.emailCliente && !part.telefoneCliente && <span>• {part.emailCliente}</span>}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-right flex flex-col items-end gap-2">
+                        <div>
+                          {isWinner ? (
+                            <Badge className="bg-yellow-500 text-white gap-1">
+                              <Trophy className="h-3 w-3" /> Venceu!
+                            </Badge>
+                          ) : part.jogo?.estado === 'terminado' ? (
+                            <Badge variant="secondary">Terminado</Badge>
+                          ) : (
+                            <Badge variant="default">Ativo</Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <div className="w-8 h-8 bg-green-100 border-2 border-green-500 rounded-full flex items-center justify-center font-bold text-green-700">
+                            {part.jogo?.tipo === 'poio_vaca'
+                              ? `${part.dadosParticipacao.letra}${part.dadosParticipacao.numero}`
+                              : part.dadosParticipacao.numero
+                            }
+                          </div>
+                        </div>
+                        <p className="text-sm text-muted-foreground">{part.valorPago}€</p>
+
+                        {/* Botões de ação para admins */}
+                        {user && ['super_admin', 'aldeia_admin'].includes(user.role) && !part.jogo?.sorteio && (
+                          <div className="flex gap-1 mt-1">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openAlterarModal(part);
+                              }}
+                              className="h-7 text-xs"
+                            >
+                              <Settings className="h-3 w-3 mr-1" />
+                              Alterar
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openHistoricoModal(part);
+                              }}
+                              className="h-7 text-xs"
+                            >
+                              <Clock className="h-3 w-3 mr-1" />
+                              Histórico
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            );
+          })}
+        </div>
+      )}
+    </motion.div>
+  );
+
+  const renderAdmin = () => (
+    <motion.div
+      className="space-y-6"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+    >
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-bold flex items-center gap-2">
+            <Settings className="h-6 w-6 text-green-600" />
+            Painel de Administração
+          </h2>
+          <p className="text-muted-foreground">Gerir aldeias, eventos e jogos</p>
+        </div>
+        <Badge variant="outline" className="font-mono">{user?.role}</Badge>
+      </div>
+
+      {!user ? (
+        <EmptyState
+          icon={Users}
+          title="Inicie sessão"
+          description="Faça login como administrador para aceder a esta área"
+          action={<Button onClick={() => setAuthModalOpen(true)}>Entrar</Button>}
+        />
+      ) : !['super_admin', 'aldeia_admin'].includes(user.role) ? (
+        <EmptyState
+          icon={Award}
+          title="Acesso restrito"
+          description="Apenas administradores podem aceder a esta área"
+        />
+      ) : (
+        <Tabs defaultValue="dashboard" className="space-y-6" onValueChange={(value) => {
+          if (value === 'backups' && user?.role === 'super_admin') {
+            fetchBackups();
+          }
+          if (value === 'dashboard') {
+            fetchDashboardStats();
+          }
+        }}>
+          <TabsList className={cn(
+            "grid w-full",
+            user?.role === 'super_admin' ? "grid-cols-8" : "grid-cols-6"
+          )}>
+            <TabsTrigger value="dashboard" className="gap-2" onClick={() => fetchDashboardStats()}>
+              <BarChart3 className="h-4 w-4" />
+              Dashboard
+            </TabsTrigger>
+            <TabsTrigger value="jogos" className="gap-2">
+              <Gamepad2 className="h-4 w-4" />
+              Jogos
+            </TabsTrigger>
+            <TabsTrigger value="eventos" className="gap-2">
+              <Calendar className="h-4 w-4" />
+              Eventos
+            </TabsTrigger>
+            <TabsTrigger value="aldeias" className="gap-2">
+              <MapPin className="h-4 w-4" />
+              Aldeias
+            </TabsTrigger>
+            <TabsTrigger value="vendedores" className="gap-2">
+              <Users className="h-4 w-4" />
+              Vendedores
+            </TabsTrigger>
+            <TabsTrigger value="premios" className="gap-2" onClick={() => fetchPremios()}>
+              <Gift className="h-4 w-4" />
+              Prémios
+            </TabsTrigger>
+            {user?.role === 'super_admin' && (
+              <TabsTrigger value="backups" className="gap-2" onClick={() => fetchBackups()}>
+                <Database className="h-4 w-4" />
+                Backups
+              </TabsTrigger>
+            )}
+            {user?.role === 'super_admin' && (
+              <TabsTrigger value="logs" className="gap-2" onClick={() => fetchLogs()}>
+                <Activity className="h-4 w-4" />
+                Logs
+              </TabsTrigger>
+            )}
+          </TabsList>
+
+          {/* Dashboard Tab (FASE 6) */}
+          <TabsContent value="dashboard" className="space-y-6">
+            {dashboardLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-green-600" />
+              </div>
+            ) : (
+              <>
+                {/* Organization Header */}
+                {dashboardStats.organizacao && (
+                  <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950 dark:to-emerald-950 rounded-lg border">
+                    {dashboardStats.organizacao.logoBase64 ? (
+                      <img
+                        src={dashboardStats.organizacao.logoBase64}
+                        alt="Logo"
+                        className="w-16 h-16 rounded-lg object-cover border"
+                      />
+                    ) : (
+                      <div className="w-16 h-16 bg-gradient-to-br from-green-400 to-emerald-600 rounded-lg flex items-center justify-center text-white text-2xl">
+                        {dashboardStats.organizacao.tipoOrganizacao === 'escola' ? '🏫' :
+                         dashboardStats.organizacao.tipoOrganizacao === 'associacao_pais' ? '👨‍👩‍👧‍👦' :
+                         dashboardStats.organizacao.tipoOrganizacao === 'clube' ? '⚽' : '🏘️'}
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      <h3 className="text-xl font-bold">{dashboardStats.organizacao.nome}</h3>
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Badge className={cn(
+                          dashboardStats.organizacao.tipoOrganizacao === 'aldeia' && "bg-green-500",
+                          dashboardStats.organizacao.tipoOrganizacao === 'escola' && "bg-blue-500",
+                          dashboardStats.organizacao.tipoOrganizacao === 'associacao_pais' && "bg-purple-500",
+                          dashboardStats.organizacao.tipoOrganizacao === 'clube' && "bg-orange-500"
+                        )}>
+                          {dashboardStats.organizacao.tipoOrganizacao === 'aldeia' && 'Aldeia'}
+                          {dashboardStats.organizacao.tipoOrganizacao === 'escola' && 'Escola'}
+                          {dashboardStats.organizacao.tipoOrganizacao === 'associacao_pais' && 'Assoc. Pais'}
+                          {dashboardStats.organizacao.tipoOrganizacao === 'clube' && 'Clube'}
+                        </Badge>
+                        {dashboardStats.organizacao.localidade && (
+                          <span className="text-sm">• {dashboardStats.organizacao.localidade}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* PDF Export Buttons */}
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => handleExportPDF('dashboard')}
+                    className="gap-2"
+                  >
+                    <FileText className="h-4 w-4" />
+                    Exportar Relatório Geral (PDF)
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => handleExportPDF('participacoes')}
+                    className="gap-2"
+                  >
+                    <FileText className="h-4 w-4" />
+                    Exportar Participações (PDF)
+                  </Button>
+                </div>
+
+                {/* Stats Cards */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center">
+                          <Euro className="h-5 w-5 text-green-600 dark:text-green-400" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Total Angariado</p>
+                          <p className="text-xl font-bold">{dashboardStats.totalAngariado.toFixed(2)}€</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
+                          <Ticket className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Participações</p>
+                          <p className="text-xl font-bold">{dashboardStats.totalParticipacoes}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
+                          <Calendar className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Eventos Ativos</p>
+                          <p className="text-xl font-bold">{dashboardStats.eventosAtivos}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-amber-100 dark:bg-amber-900 rounded-lg flex items-center justify-center">
+                          <Gamepad2 className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Jogos Ativos</p>
+                          <p className="text-xl font-bold">{dashboardStats.jogosAtivos}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Charts Row */}
+                <div className="grid md:grid-cols-2 gap-6">
+                  {/* Histórico Mensal */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <TrendingUp className="h-5 w-5 text-green-600" />
+                        Evolução Mensal
+                      </CardTitle>
+                      <CardDescription>Últimos 6 meses</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        {dashboardStats.historicoMensal.map((item, idx) => {
+                          const maxValor = Math.max(...dashboardStats.historicoMensal.map(h => h.valor), 1);
+                          const percent = (item.valor / maxValor) * 100;
+                          return (
+                            <div key={idx} className="space-y-1">
+                              <div className="flex justify-between text-sm">
+                                <span className="capitalize">{item.mes}</span>
+                                <span className="font-medium">{item.valor.toFixed(2)}€</span>
+                              </div>
+                              <div className="h-2 bg-muted rounded-full overflow-hidden">
+                                <motion.div
+                                  initial={{ width: 0 }}
+                                  animate={{ width: `${percent}%` }}
+                                  transition={{ duration: 0.5, delay: idx * 0.1 }}
+                                  className="h-full bg-gradient-to-r from-green-400 to-emerald-500 rounded-full"
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Ranking Vendedores */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <Trophy className="h-5 w-5 text-yellow-500" />
+                        Top Vendedores
+                      </CardTitle>
+                      <CardDescription>Por valor angariado</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {dashboardStats.rankingVendedores.length === 0 ? (
+                        <p className="text-center text-muted-foreground py-8">
+                          Sem dados de vendedores
+                        </p>
+                      ) : (
+                        <div className="space-y-3">
+                          {dashboardStats.rankingVendedores.map((vendedor, idx) => (
+                            <div key={idx} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50">
+                              <div className={cn(
+                                "w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm",
+                                idx === 0 && "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300",
+                                idx === 1 && "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
+                                idx === 2 && "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300",
+                                idx > 2 && "bg-muted text-muted-foreground"
+                              )}>
+                                {idx + 1}
+                              </div>
+                              <div className="flex-1">
+                                <p className="font-medium">{vendedor.nome}</p>
+                                <p className="text-xs text-muted-foreground">{vendedor.vendas} vendas</p>
+                              </div>
+                              <p className="font-bold text-green-600">{vendedor.valor.toFixed(2)}€</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Additional Stats for Schools */}
+                {dashboardStats.organizacao?.tipoOrganizacao === 'escola' && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <School className="h-5 w-5 text-blue-600" />
+                        Informação Escolar
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="text-center p-4 bg-blue-50 dark:bg-blue-950 rounded-lg">
+                          <p className="text-2xl font-bold text-blue-600">{dashboardStats.totalVendedores}</p>
+                          <p className="text-sm text-muted-foreground">Professores/Vendedores</p>
+                        </div>
+                        <div className="text-center p-4 bg-green-50 dark:bg-green-950 rounded-lg">
+                          <p className="text-2xl font-bold text-green-600">{dashboardStats.totalPremios}</p>
+                          <p className="text-sm text-muted-foreground">Prémios Disponíveis</p>
+                        </div>
+                        <div className="text-center p-4 bg-purple-50 dark:bg-purple-950 rounded-lg">
+                          <p className="text-2xl font-bold text-purple-600">{dashboardStats.totalEventos}</p>
+                          <p className="text-sm text-muted-foreground">Campanhas</p>
+                        </div>
+                        <div className="text-center p-4 bg-amber-50 dark:bg-amber-950 rounded-lg">
+                          <p className="text-2xl font-bold text-amber-600">{dashboardStats.totalJogos}</p>
+                          <p className="text-sm text-muted-foreground">Jogos Realizados</p>
+                        </div>
+                      </div>
+                      {dashboardStats.organizacao.nivelEnsino && (
+                        <div className="mt-4 p-3 bg-muted rounded-lg">
+                          <p className="text-sm text-muted-foreground">Nível de Ensino:</p>
+                          <p className="font-medium capitalize">{dashboardStats.organizacao.nivelEnsino.replace('_', ' ')}</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Additional Stats for Clubs */}
+                {dashboardStats.organizacao?.tipoOrganizacao === 'clube' && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <Target className="h-5 w-5 text-orange-600" />
+                        Performance do Clube
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="text-center p-4 bg-orange-50 dark:bg-orange-950 rounded-lg">
+                          <p className="text-2xl font-bold text-orange-600">{dashboardStats.totalParticipacoes}</p>
+                          <p className="text-sm text-muted-foreground">Participações</p>
+                        </div>
+                        <div className="text-center p-4 bg-green-50 dark:bg-green-950 rounded-lg">
+                          <p className="text-2xl font-bold text-green-600">{dashboardStats.totalAngariado.toFixed(0)}€</p>
+                          <p className="text-sm text-muted-foreground">Angariado</p>
+                        </div>
+                        <div className="text-center p-4 bg-blue-50 dark:bg-blue-950 rounded-lg">
+                          <p className="text-2xl font-bold text-blue-600">{dashboardStats.totalVendedores}</p>
+                          <p className="text-sm text-muted-foreground">Colaboradores</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Comparativo Ano a Ano */}
+                {yearComparison && (
+                  <Card>
+                    <CardHeader>
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div>
+                          <CardTitle className="text-lg flex items-center gap-2">
+                            <BarChart3 className="h-5 w-5 text-indigo-600" />
+                            Comparativo Ano a Ano
+                          </CardTitle>
+                          <CardDescription>Compare a evolução entre anos</CardDescription>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={selectedYear}
+                            onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                            className="px-3 py-1.5 text-sm border rounded-lg bg-background"
+                          >
+                            {[2024, 2025, 2026].map(y => (
+                              <option key={y} value={y}>{y}</option>
+                            ))}
+                          </select>
+                          <span className="text-muted-foreground">vs</span>
+                          <select
+                            value={compareYear}
+                            onChange={(e) => setCompareYear(parseInt(e.target.value))}
+                            className="px-3 py-1.5 text-sm border rounded-lg bg-background"
+                          >
+                            {[2022, 2023, 2024, 2025].map(y => (
+                              <option key={y} value={y}>{y}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      {/* Resumo da comparação */}
+                      <div className="grid grid-cols-3 gap-4 mb-6">
+                        <div className="text-center p-4 bg-indigo-50 dark:bg-indigo-950 rounded-lg">
+                          <p className="text-sm text-muted-foreground mb-1">{selectedYear}</p>
+                          <p className="text-2xl font-bold text-indigo-600">{yearComparison.selectedYear.total.toFixed(2)}€</p>
+                        </div>
+                        <div className="text-center p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                          <p className="text-sm text-muted-foreground mb-1">{compareYear}</p>
+                          <p className="text-2xl font-bold text-gray-600 dark:text-gray-400">{yearComparison.compareYear.total.toFixed(2)}€</p>
+                        </div>
+                        <div className={cn(
+                          "text-center p-4 rounded-lg",
+                          yearComparison.variacao >= 0
+                            ? "bg-green-50 dark:bg-green-950"
+                            : "bg-red-50 dark:bg-red-950"
+                        )}>
+                          <p className="text-sm text-muted-foreground mb-1">Variação</p>
+                          <p className={cn(
+                            "text-2xl font-bold flex items-center justify-center gap-1",
+                            yearComparison.variacao >= 0 ? "text-green-600" : "text-red-600"
+                          )}>
+                            {yearComparison.variacao >= 0 ? (
+                              <TrendingUp className="h-5 w-5" />
+                            ) : (
+                              <TrendingUp className="h-5 w-5 rotate-180" />
+                            )}
+                            {Math.abs(yearComparison.variacao).toFixed(1)}%
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Gráfico de barras comparativo */}
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-4 mb-4">
+                          <div className="flex items-center gap-2">
+                            <div className="w-4 h-4 bg-indigo-500 rounded"></div>
+                            <span className="text-sm text-muted-foreground">{selectedYear}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="w-4 h-4 bg-gray-300 rounded"></div>
+                            <span className="text-sm text-muted-foreground">{compareYear}</span>
+                          </div>
+                        </div>
+
+                        {yearComparison.selectedYear.meses.map((mes, idx) => {
+                          const maxValor = Math.max(
+                            ...yearComparison.selectedYear.meses.map(m => m.valor),
+                            ...yearComparison.compareYear.meses.map(m => m.valor),
+                            1
+                          );
+                          const percentSelected = (mes.valor / maxValor) * 100;
+                          const percentCompare = (yearComparison.compareYear.meses[idx].valor / maxValor) * 100;
+
+                          return (
+                            <div key={idx} className="space-y-1">
+                              <div className="flex justify-between text-sm">
+                                <span className="capitalize w-12">{mes.mes}</span>
+                                <div className="flex gap-4 text-right">
+                                  <span className="font-medium text-indigo-600 w-20">{mes.valor.toFixed(2)}€</span>
+                                  <span className="text-muted-foreground w-20">{yearComparison.compareYear.meses[idx].valor.toFixed(2)}€</span>
+                                </div>
+                              </div>
+                              <div className="flex gap-1 h-3">
+                                <div className="flex-1 bg-muted rounded-full overflow-hidden">
+                                  <motion.div
+                                    initial={{ width: 0 }}
+                                    animate={{ width: `${percentSelected}%` }}
+                                    transition={{ duration: 0.5, delay: idx * 0.03 }}
+                                    className="h-full bg-indigo-500 rounded-full"
+                                  />
+                                </div>
+                                <div className="flex-1 bg-muted rounded-full overflow-hidden">
+                                  <motion.div
+                                    initial={{ width: 0 }}
+                                    animate={{ width: `${percentCompare}%` }}
+                                    transition={{ duration: 0.5, delay: idx * 0.03 + 0.1 }}
+                                    className="h-full bg-gray-300 dark:bg-gray-600 rounded-full"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Gráficos Detalhados por Evento */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <PieChart className="h-5 w-5 text-purple-600" />
+                      Análise por Evento
+                    </CardTitle>
+                    <CardDescription>Selecione um evento para ver estatísticas detalhadas</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="mb-4">
+                      <select
+                        value={selectedEventId}
+                        onChange={(e) => setSelectedEventId(e.target.value)}
+                        className="w-full px-3 py-2 border rounded-lg bg-background"
+                      >
+                        <option value="">Selecione um evento...</option>
+                        {eventos.map(e => (
+                          <option key={e.id} value={e.id}>{e.nome} ({e.estado})</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {eventStatsLoading && (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                        <span className="text-muted-foreground">A carregar estatísticas...</span>
+                      </div>
+                    )}
+
+                    {eventStats && !eventStatsLoading && (
+                      <div className="space-y-6">
+                        {/* Resumo do Evento */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                          <div className="text-center p-4 bg-purple-50 dark:bg-purple-950 rounded-lg">
+                            <p className="text-2xl font-bold text-purple-600">{eventStats.totalParticipacoes}</p>
+                            <p className="text-sm text-muted-foreground">Participações</p>
+                          </div>
+                          <div className="text-center p-4 bg-green-50 dark:bg-green-950 rounded-lg">
+                            <p className="text-2xl font-bold text-green-600">{eventStats.totalAngariado.toFixed(2)}€</p>
+                            <p className="text-sm text-muted-foreground">Total Angariado</p>
+                          </div>
+                          <div className="text-center p-4 bg-blue-50 dark:bg-blue-950 rounded-lg">
+                            <p className="text-2xl font-bold text-blue-600">{eventStats.jogosStats.length}</p>
+                            <p className="text-sm text-muted-foreground">Jogos</p>
+                          </div>
+                          <div className="text-center p-4 bg-amber-50 dark:bg-amber-950 rounded-lg">
+                            <p className="text-2xl font-bold text-amber-600">
+                              {eventStats.totalParticipacoes > 0
+                                ? (eventStats.totalAngariado / eventStats.totalParticipacoes).toFixed(2)
+                                : '0.00'}€
+                            </p>
+                            <p className="text-sm text-muted-foreground">Ticket Médio</p>
+                          </div>
+                        </div>
+
+                        {/* Gráfico de Jogos e evolução diária */}
+                        <div className="grid md:grid-cols-2 gap-6">
+                          {/* Jogos do Evento */}
+                          <div>
+                            <h4 className="font-semibold mb-3 flex items-center gap-2">
+                              <Gamepad2 className="h-4 w-4" />
+                              Jogos do Evento
+                            </h4>
+                            <div className="space-y-2 max-h-64 overflow-y-auto">
+                              {eventStats.jogosStats.map((item, idx) => (
+                                <div key={idx} className="flex items-center justify-between p-2 bg-muted/50 rounded-lg">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-lg">
+                                      {GAME_TYPES[item.jogo.tipo as keyof typeof GAME_TYPES]?.emoji || '🎲'}
+                                    </span>
+                                    <div>
+                                      <p className="font-medium capitalize text-sm">{item.jogo.tipo.replace('_', ' ')}</p>
+                                      <p className="text-xs text-muted-foreground">{item.participacoes} participações</p>
+                                    </div>
+                                  </div>
+                                  <p className="font-bold text-green-600">{item.angariado.toFixed(2)}€</p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Métodos de Pagamento */}
+                          <div>
+                            <h4 className="font-semibold mb-3 flex items-center gap-2">
+                              <CreditCard className="h-4 w-4" />
+                              Métodos de Pagamento
+                            </h4>
+                            <div className="space-y-3">
+                              {eventStats.metodosPagamento.map((m, idx) => {
+                                const totalMetodos = eventStats.metodosPagamento.reduce((sum, mm) => sum + mm.total, 0);
+                                const percent = totalMetodos > 0 ? (m.total / totalMetodos) * 100 : 0;
+                                return (
+                                  <div key={idx} className="space-y-1">
+                                    <div className="flex justify-between text-sm">
+                                      <span className="flex items-center gap-2">
+                                        {m.metodo === 'MBWay' ? (
+                                          <span className="text-blue-600 font-bold">MB</span>
+                                        ) : (
+                                          <Euro className="h-4 w-4 text-green-600" />
+                                        )}
+                                        {m.metodo}
+                                      </span>
+                                      <span>{m.total} ({percent.toFixed(0)}%)</span>
+                                    </div>
+                                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                                      <motion.div
+                                        initial={{ width: 0 }}
+                                        animate={{ width: `${percent}%` }}
+                                        transition={{ duration: 0.5 }}
+                                        className={cn(
+                                          "h-full rounded-full",
+                                          m.metodo === 'MBWay' ? "bg-blue-500" : "bg-green-500"
+                                        )}
+                                      />
+                                    </div>
+                                    <p className="text-xs text-muted-foreground text-right">{m.valor.toFixed(2)}€</p>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Evolução Diária */}
+                        {eventStats.evolucaoDiaria.length > 0 && (
+                          <div>
+                            <h4 className="font-semibold mb-3 flex items-center gap-2">
+                              <TrendingUp className="h-4 w-4" />
+                              Evolução Diária (Últimos 30 dias)
+                            </h4>
+                            <div className="space-y-2">
+                              {eventStats.evolucaoDiaria.slice(-14).map((dia, idx) => {
+                                const maxValor = Math.max(...eventStats.evolucaoDiaria.map(d => d.valor), 1);
+                                const percent = (dia.valor / maxValor) * 100;
+                                return (
+                                  <div key={idx} className="space-y-1">
+                                    <div className="flex justify-between text-sm">
+                                      <span>{dia.dia}</span>
+                                      <div className="flex gap-4">
+                                        <span className="text-muted-foreground">{dia.participacoes} part.</span>
+                                        <span className="font-medium text-green-600">{dia.valor.toFixed(2)}€</span>
+                                      </div>
+                                    </div>
+                                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                                      <motion.div
+                                        initial={{ width: 0 }}
+                                        animate={{ width: `${percent}%` }}
+                                        transition={{ duration: 0.3, delay: idx * 0.02 }}
+                                        className="h-full bg-gradient-to-r from-green-400 to-emerald-500 rounded-full"
+                                      />
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </>
+            )}
+          </TabsContent>
+
+          <TabsContent value="jogos" className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-semibold">Jogos ({jogosAdmin.length})</h3>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => handleExportCSV('participacoes')} className="gap-2">
+                  <Download className="h-4 w-4" />
+                  Exportar CSV
+                </Button>
+                <Button onClick={() => openCreateModal('jogo')} className="gap-2">
+                  <Plus className="h-4 w-4" /> Novo Jogo
+                </Button>
+              </div>
+            </div>
+
+            {jogosAdmin.length === 0 ? (
+              <EmptyState
+                icon={Gamepad2}
+                title="Sem jogos"
+                description="Crie um jogo para começar a angariar fundos"
+              />
+            ) : (
+              <div className="grid gap-4">
+                {jogosAdmin.map((jogo) => (
+                  <Card key={jogo.id}>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center text-xl">
+                            {GAME_TYPES[jogo.tipo as keyof typeof GAME_TYPES]?.emoji || '🎲'}
+                          </div>
+                          <div>
+                            <p className="font-semibold capitalize">{jogo.tipo.replace('_', ' ')}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {jogo.evento?.nome} • {jogo.evento?.aldeia?.nome}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant={
+                            jogo.estado === 'ativo' ? 'default' :
+                            jogo.estado === 'fechado' ? 'secondary' : 'outline'
+                          }>
+                            {jogo.estado}
+                          </Badge>
+                          {jogo.estado === 'fechado' && !jogo.sorteio && (
+                            <Button size="sm" onClick={() => handleSorteio(jogo.id)}>
+                              <Trophy className="h-4 w-4 mr-1" /> Sortear
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="eventos" className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-semibold">Eventos ({eventos.length})</h3>
+              <Button onClick={() => openCreateModal('evento')} className="gap-2">
+                <Plus className="h-4 w-4" /> Novo Evento
+              </Button>
+            </div>
+
+            {eventos.length === 0 ? (
+              <EmptyState
+                icon={Calendar}
+                title="Sem eventos"
+                description="Crie um evento para organizar jogos"
+              />
+            ) : (
+              <div className="grid gap-4">
+                {eventos.map((evento) => (
+                  <Card key={evento.id}>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          {evento.imagemBase64 ? (
+                            <img
+                              src={evento.imagemBase64}
+                              alt={evento.nome}
+                              className="w-10 h-10 object-cover rounded-full border-2 border-blue-200"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
+                              <Calendar className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                            </div>
+                          )}
+                          <div>
+                            <p className="font-semibold">{evento.nome}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {evento.aldeia?.nome} • {new Date(evento.dataInicio).toLocaleDateString('pt-PT')}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary">{evento._count?.jogos || 0} jogos</Badge>
+                          <Badge variant={
+                            evento.estado === 'ativo' ? 'default' : 'outline'
+                          }>
+                            {evento.estado}
+                          </Badge>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openEventoDetalheModal(evento)}
+                            className="gap-1"
+                          >
+                            <Eye className="h-4 w-4" />
+                            <span className="hidden sm:inline">Detalhes</span>
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="aldeias" className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-semibold">Organizações ({aldeias.length})</h3>
+              {user?.role === 'super_admin' && (
+                <Button onClick={() => openCreateModal('aldeia')} className="gap-2">
+                  <Plus className="h-4 w-4" /> Nova Organização
+                </Button>
+              )}
+            </div>
+
+            {aldeias.length === 0 ? (
+              <EmptyState
+                icon={MapPin}
+                title="Sem organizações"
+                description={user?.role === 'super_admin' ? "Crie uma organização para começar" : "Contacte o super admin para criar organizações"}
+              />
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2">
+                {aldeias.map((aldeia) => {
+                  const tipoIcon: Record<string, string> = {
+                    aldeia: '🏘️',
+                    escola: '🏫',
+                    associacao_pais: '👨‍👩‍👧‍👦',
+                    clube: '⚽'
+                  };
+                  const tipoLabel: Record<string, string> = {
+                    aldeia: 'Aldeia',
+                    escola: 'Escola',
+                    associacao_pais: 'Assoc. Pais',
+                    clube: 'Clube'
+                  };
+                  const tipoBg: Record<string, string> = {
+                    aldeia: 'bg-green-100 dark:bg-green-900',
+                    escola: 'bg-blue-100 dark:bg-blue-900',
+                    associacao_pais: 'bg-purple-100 dark:bg-purple-900',
+                    clube: 'bg-orange-100 dark:bg-orange-900'
+                  };
+                  const tipo = aldeia.tipoOrganizacao || 'aldeia';
+
+                  return (
+                    <Card key={aldeia.id}>
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-4">
+                          {aldeia.logoBase64 ? (
+                            <img
+                              src={aldeia.logoBase64}
+                              alt={aldeia.nome}
+                              className="w-12 h-12 object-cover rounded-full border-2 border-green-200"
+                            />
+                          ) : aldeia.logoUrl ? (
+                            <img
+                              src={aldeia.logoUrl}
+                              alt={aldeia.nome}
+                              className="w-12 h-12 object-cover rounded-full border-2 border-green-200"
+                            />
+                          ) : (
+                            <div className={cn("w-12 h-12 rounded-full flex items-center justify-center", tipoBg[tipo])}>
+                              <span className="text-xl">{tipoIcon[tipo]}</span>
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="font-semibold truncate">{aldeia.nome}</p>
+                              <Badge variant="outline" className="text-xs shrink-0">
+                                {tipoLabel[tipo]}
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground truncate">
+                              {aldeia.localizacao || aldeia.morada || aldeia.localidade || 'Sem localização'}
+                            </p>
+                          </div>
+                          <div className="flex gap-1 sm:gap-2 shrink-0">
+                            <Badge variant="secondary" className="text-xs">{aldeia._count?.eventos || 0} eventos</Badge>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openOrgDetalheModal(aldeia)}
+                              className="gap-1"
+                            >
+                              <Eye className="h-4 w-4" />
+                              <span className="hidden sm:inline">Detalhes</span>
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="vendedores" className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-semibold">Vendedores ({vendedores.length})</h3>
+              <Button onClick={() => setNovoVendedorModalOpen(true)} className="gap-2">
+                <Plus className="h-4 w-4" /> Novo Vendedor
+              </Button>
+            </div>
+
+            {vendedores.length === 0 ? (
+              <EmptyState
+                icon={Users}
+                title="Sem vendedores"
+                description="Adicione vendedores para ajudar na angariação de fundos"
+                action={<Button onClick={() => setNovoVendedorModalOpen(true)}>Adicionar Vendedor</Button>}
+              />
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2">
+                {vendedores.map((vendedor) => (
+                  <Card key={vendedor.id}>
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                          <Users className="h-6 w-6 text-blue-600" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-semibold">{vendedor.nome}</p>
+                          <p className="text-sm text-muted-foreground">{vendedor.email}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Criado em {new Date(vendedor.createdAt).toLocaleDateString('pt-PT')}
+                          </p>
+                        </div>
+                        <Badge variant="secondary" className="bg-blue-50 text-blue-700">
+                          Vendedor
+                        </Badge>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          {user?.role === 'super_admin' && (
+            <TabsContent value="backups" className="space-y-4">
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <Database className="h-5 w-5" />
+                  Gestão de Backups
+                </h3>
+                <Button 
+                  onClick={handleCreateBackup}
+                  className="gap-2"
+                  disabled={backupCreating}
+                >
+                  {backupCreating ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4" />
+                  )}
+                  Criar Backup
+                </Button>
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardDescription>
+                    Faça backups regulares da base de dados para prevenir perda de dados.
+                    Os backups são armazenados no servidor.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {backupsLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                      <span className="text-muted-foreground">A carregar backups...</span>
+                    </div>
+                  ) : backups.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Database className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                      <p>Nenhum backup disponível</p>
+                      <p className="text-sm">Clique em "Criar Backup" para fazer o primeiro backup</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3 max-h-96 overflow-y-auto">
+                      {backups.map((backup) => (
+                        <div
+                          key={backup.nome}
+                          className="flex items-center justify-between p-4 bg-muted/50 rounded-lg"
+                        >
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
+                              <Database className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                            </div>
+                            <div>
+                              <p className="font-medium text-sm">{backup.nome}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {(backup.tamanho / 1024).toFixed(2)} KB • {new Date(backup.criadoEm).toLocaleString('pt-PT')}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleRestoreBackup(backup.nome)}
+                              disabled={backupRestoring === backup.nome || backupDeleting === backup.nome}
+                              className="gap-1"
+                            >
+                              {backupRestoring === backup.nome ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <RotateCcw className="h-3 w-3" />
+                              )}
+                              Restaurar
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => handleDeleteBackup(backup.nome)}
+                              disabled={backupRestoring === backup.nome || backupDeleting === backup.nome}
+                              className="gap-1"
+                            >
+                              {backupDeleting === backup.nome ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-3 w-3" />
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
+
+          {user?.role === 'super_admin' && (
+            <TabsContent value="logs" className="space-y-4">
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <Activity className="h-5 w-5" />
+                  Logs de Acesso
+                </h3>
+              </div>
+
+              {/* Stats */}
+              {logsStats && (
+                <div className="grid gap-4 md:grid-cols-3">
+                  <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+                    <CardHeader className="pb-2">
+                      <CardDescription className="text-green-600">Logins Hoje</CardDescription>
+                      <CardTitle className="text-3xl text-green-700">{logsStats.loginsHoje}</CardTitle>
+                    </CardHeader>
+                  </Card>
+                  <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+                    <CardHeader className="pb-2">
+                      <CardDescription className="text-blue-600">Total Logins</CardDescription>
+                      <CardTitle className="text-3xl text-blue-700">{logsStats.totalLogins}</CardTitle>
+                    </CardHeader>
+                  </Card>
+                  <Card className="bg-gradient-to-br from-red-50 to-red-100 border-red-200">
+                    <CardHeader className="pb-2">
+                      <CardDescription className="text-red-600">Tentativas Falhadas</CardDescription>
+                      <CardTitle className="text-3xl text-red-700">{logsStats.totalFalhas}</CardTitle>
+                    </CardHeader>
+                  </Card>
+                </div>
+              )}
+
+              <Card>
+                <CardHeader>
+                  <CardDescription>
+                    Histórico de tentativas de login no sistema.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {logsLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                      <span className="text-muted-foreground">A carregar logs...</span>
+                    </div>
+                  ) : logs.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Activity className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                      <p>Nenhum log disponível</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3 max-h-96 overflow-y-auto">
+                      {logs.map((log) => (
+                        <div
+                          key={log.id}
+                          className="flex items-center justify-between p-4 bg-muted/50 rounded-lg"
+                        >
+                          <div className="flex items-center gap-4">
+                            <div className={cn(
+                              "w-10 h-10 rounded-full flex items-center justify-center",
+                              log.sucesso
+                                ? "bg-green-100 dark:bg-green-900"
+                                : "bg-red-100 dark:bg-red-900"
+                            )}>
+                              {log.sucesso ? (
+                                <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
+                              ) : (
+                                <X className="h-5 w-5 text-red-600 dark:text-red-400" />
+                              )}
+                            </div>
+                            <div>
+                              <p className="font-medium text-sm">{log.user?.nome || 'Utilizador desconhecido'}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {log.user?.email} • {log.user?.role}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {new Date(log.createdAt).toLocaleString('pt-PT')}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <div className="text-right">
+                              <p className="text-xs text-muted-foreground flex items-center gap-1 justify-end">
+                                <Monitor className="h-3 w-3" />
+                                {log.ip || 'N/A'}
+                              </p>
+                              <p className="text-xs text-muted-foreground flex items-center gap-1 justify-end">
+                                <Wifi className="h-3 w-3" />
+                                {log.userAgent?.slice(0, 30) || 'N/A'}...
+                              </p>
+                            </div>
+                            <Badge variant={log.sucesso ? 'default' : 'destructive'} className="text-xs">
+                              {log.sucesso ? 'Sucesso' : 'Falhou'}
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
+        </Tabs>
+      )}
+    </motion.div>
+  );
+
+  // Vendedor Dashboard
+  const renderVendedorDashboard = () => {
+    const totalVendas = vendasVendedor.length;
+    const totalAngariado = vendasVendedor.reduce((sum, v) => sum + v.valorPago, 0);
+    const vendasHoje = vendasVendedor.filter(v => {
+      const today = new Date();
+      const vendaDate = new Date(v.createdAt);
+      return vendaDate.toDateString() === today.toDateString();
+    }).length;
+
+    return (
+      <motion.div
+        className="space-y-6"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+      >
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h2 className="text-2xl font-bold flex items-center gap-2">
+              <ShoppingBag className="h-6 w-6 text-blue-600" />
+              Painel de Vendedor
+            </h2>
+            <p className="text-muted-foreground">As suas vendas e métricas</p>
+          </div>
+          <Badge variant="outline" className="font-mono bg-blue-50 text-blue-700">Vendedor</Badge>
+        </div>
+
+        {/* Métricas Cards */}
+        <div className="grid gap-4 md:grid-cols-3">
+          <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+            <CardHeader className="pb-2">
+              <CardDescription className="text-blue-600">Total Angariado</CardDescription>
+              <CardTitle className="text-3xl text-blue-700">{totalAngariado.toFixed(2)}€</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-2 text-sm text-blue-600">
+                <TrendingUp className="h-4 w-4" />
+                <span>{totalVendas} participações vendidas</span>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+            <CardHeader className="pb-2">
+              <CardDescription className="text-green-600">Vendas Hoje</CardDescription>
+              <CardTitle className="text-3xl text-green-700">{vendasHoje}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-2 text-sm text-green-600">
+                <Clock className="h-4 w-4" />
+                <span>Vendas de hoje</span>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+            <CardHeader className="pb-2">
+              <CardDescription className="text-purple-600">Total de Vendas</CardDescription>
+              <CardTitle className="text-3xl text-purple-700">{totalVendas}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-2 text-sm text-purple-600">
+                <Ticket className="h-4 w-4" />
+                <span>Participações registadas</span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Lista de Vendas */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Ticket className="h-5 w-5" />
+              Últimas Vendas
+            </CardTitle>
+            <CardDescription>
+              Participações registadas por si para clientes
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {vendasVendedor.length === 0 ? (
+              <EmptyState
+                icon={ShoppingBag}
+                title="Sem vendas registadas"
+                description="Quando registar participações para clientes, elas aparecerão aqui"
+                action={<Button onClick={() => setActiveView('public')}>Ver Jogos</Button>}
+              />
+            ) : (
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                {vendasVendedor.slice(0, 20).map((venda, index) => {
+                  const gameType = GAME_TYPES[venda.jogo?.tipo as keyof typeof GAME_TYPES] || GAME_TYPES.rifa;
+                  return (
+                    <motion.div
+                      key={venda.id}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                      className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-xl">
+                          {gameType.emoji}
+                        </div>
+                        <div>
+                          <p className="font-medium">
+                            {venda.jogo?.tipo === 'poio_vaca'
+                              ? `${venda.dadosParticipacao?.letra}${venda.dadosParticipacao?.numero}`
+                              : `Nº ${venda.dadosParticipacao?.numero}`}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {venda.nomeCliente || 'Cliente não identificado'}
+                            {venda.telefoneCliente && <span className="ml-2">• {venda.telefoneCliente}</span>}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(venda.createdAt).toLocaleDateString('pt-PT')} • {venda.metodoPagamento}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold text-green-600">{venda.valorPago}€</p>
+                        <Badge variant="outline" className="text-xs">
+                          {venda.jogo?.evento?.nome || 'Evento'}
+                        </Badge>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Ações Rápidas */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Ações Rápidas</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-3">
+              <Button
+                variant="outline"
+                className="h-20 flex-col gap-2"
+                onClick={() => setActiveView('public')}
+              >
+                <Gamepad2 className="h-6 w-6" />
+                <span>Ver Jogos</span>
+              </Button>
+              <Button
+                variant="outline"
+                className="h-20 flex-col gap-2"
+                onClick={() => setActiveView('my-games')}
+              >
+                <Ticket className="h-6 w-6" />
+                <span>Minhas Participações</span>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+    );
+  };
 
   // Public Organization Page
   const renderPublicOrgPage = () => {
@@ -2964,7 +4855,7 @@ export default function DashboardPage() {
     const jogosAtivos = jogos.filter(j => j.estado === 'ativo');
 
     return (
-      <motion.div 
+      <motion.div
         className="space-y-6"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -2981,8 +4872,8 @@ export default function DashboardPage() {
           <CardContent className="relative pt-0">
             <div className="flex flex-col sm:flex-row items-start sm:items-end gap-4 -mt-12">
               {organizacao.logoBase64 ? (
-                <img 
-                  src={organizacao.logoBase64} 
+                <img
+                  src={organizacao.logoBase64}
                   alt={organizacao.nome}
                   className="w-24 h-24 object-cover rounded-full border-4 border-white dark:border-gray-900 shadow-lg"
                 />
@@ -3221,7 +5112,7 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col">
       <Toaster position="top-right" richColors closeButton />
-      
+
       {/* Header */}
       <header className="sticky top-0 z-40 bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg border-b dark:border-gray-800">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
@@ -3236,7 +5127,7 @@ export default function DashboardPage() {
           </div>
           
           <nav className="hidden md:flex items-center gap-1">
-            <Button 
+            <Button
               variant={activeView === 'public' ? 'default' : 'ghost'}
               onClick={() => setActiveView('public')}
               className="gap-2"
@@ -3244,7 +5135,7 @@ export default function DashboardPage() {
               <Globe className="h-4 w-4" />
               Jogos
             </Button>
-            <Button 
+            <Button
               variant={activeView === 'my-games' ? 'default' : 'ghost'}
               onClick={() => setActiveView('my-games')}
               className="gap-2"
@@ -3253,7 +5144,7 @@ export default function DashboardPage() {
               Meus Jogos
             </Button>
             {user && ['super_admin', 'aldeia_admin'].includes(user.role) && (
-              <Button 
+              <Button
                 variant={activeView === 'admin' ? 'default' : 'ghost'}
                 onClick={() => setActiveView('admin')}
                 className="gap-2"
@@ -3263,7 +5154,7 @@ export default function DashboardPage() {
               </Button>
             )}
             {user && user.role === 'vendedor' && (
-              <Button 
+              <Button
                 variant={activeView === 'vendedor' ? 'default' : 'ghost'}
                 onClick={() => setActiveView('vendedor')}
                 className="gap-2"
@@ -3273,7 +5164,7 @@ export default function DashboardPage() {
               </Button>
             )}
           </nav>
-          
+
           <div className="flex items-center gap-2">
             {/* Dark Mode Toggle */}
             {mounted && (
@@ -3290,7 +5181,7 @@ export default function DashboardPage() {
                 )}
               </Button>
             )}
-            
+
             {user ? (
               <div className="flex items-center gap-2">
                 <div className="hidden sm:block text-right">
@@ -3298,10 +5189,10 @@ export default function DashboardPage() {
                   <p className="text-xs text-muted-foreground">{user.email}</p>
                 </div>
                 {/* Notifications Button */}
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  onClick={() => setNotificacoesModalOpen(true)} 
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setNotificacoesModalOpen(true)}
                   title="Notificações"
                   className="relative"
                 >
@@ -3329,11 +5220,11 @@ export default function DashboardPage() {
                 Entrar
               </Button>
             )}
-            
+
             {/* Mobile menu */}
-            <Button 
-              variant="ghost" 
-              size="icon" 
+            <Button
+              variant="ghost"
+              size="icon"
               className="md:hidden"
               onClick={() => setSidebarOpen(!sidebarOpen)}
             >
@@ -3368,7 +5259,7 @@ export default function DashboardPage() {
                 </Button>
               </div>
               <nav className="space-y-2">
-                <Button 
+                <Button
                   variant={activeView === 'public' ? 'default' : 'ghost'}
                   className="w-full justify-start gap-2"
                   onClick={() => { setActiveView('public'); setSidebarOpen(false); }}
@@ -3376,7 +5267,7 @@ export default function DashboardPage() {
                   <Globe className="h-4 w-4" />
                   Jogos
                 </Button>
-                <Button 
+                <Button
                   variant={activeView === 'my-games' ? 'default' : 'ghost'}
                   className="w-full justify-start gap-2"
                   onClick={() => { setActiveView('my-games'); setSidebarOpen(false); }}
@@ -3385,7 +5276,7 @@ export default function DashboardPage() {
                   Meus Jogos
                 </Button>
                 {user && ['super_admin', 'aldeia_admin'].includes(user.role) && (
-                  <Button 
+                  <Button
                     variant={activeView === 'admin' ? 'default' : 'ghost'}
                     className="w-full justify-start gap-2"
                     onClick={() => { setActiveView('admin'); setSidebarOpen(false); }}
@@ -3395,7 +5286,7 @@ export default function DashboardPage() {
                   </Button>
                 )}
                 {user && user.role === 'vendedor' && (
-                  <Button 
+                  <Button
                     variant={activeView === 'vendedor' ? 'default' : 'ghost'}
                     className="w-full justify-start gap-2"
                     onClick={() => { setActiveView('vendedor'); setSidebarOpen(false); }}
@@ -3417,64 +5308,10 @@ export default function DashboardPage() {
             <div key="public-org">{renderPublicOrgPage()}</div>
           ) : (
             <>
-              {activeView === 'public' && <div key="public"><PublicGamesView
-                jogosPublicos={jogosPublicos}
-                loading={loading}
-                openJogoDetalhe={openJogoDetalhe}
-                handleShare={handleShare}
-                GAME_TYPES={GAME_TYPES}
-              /></div>}
-              {activeView === 'my-games' && <div key="my-games"><PlayerParticipationsView
-                minhasParticipacoes={minhasParticipacoes}
-                loading={loading}
-                setActiveView={setActiveView}
-                openJogoDetalhe={openJogoDetalhe}
-                handleRevelarRaspadinha={handleRevelarRaspadinha}
-                GAME_TYPES={GAME_TYPES}
-              /></div>}
-              {activeView === 'admin' && <div key="admin"><AdminDashboardView
-                user={user}
-                dashboardStats={dashboardStats}
-                dashboardLoading={dashboardLoading}
-                activeAdminTab={activeAdminTab}
-                setActiveAdminTab={setActiveAdminTab}
-                eventos={eventos}
-                jogosAdmin={jogosAdmin}
-                aldeias={aldeias}
-                premios={premios}
-                logs={logs}
-                logsLoading={logsLoading}
-                logsStats={logsStats}
-                backups={backups}
-                backupsLoading={backupsLoading}
-                openCreateModal={openCreateModal}
-                openEventoDetalheModal={openEventoDetalheModal}
-                openPremioModal={openPremioModal}
-                handleDeletePremio={handleDeletePremio}
-                handleCreateBackup={handleCreateBackup}
-                handleRestoreBackup={handleRestoreBackup}
-                handleDeleteBackup={handleDeleteBackup}
-                fetchDashboardStats={fetchDashboardStats}
-                selectedYear={selectedYear}
-                setSelectedYear={setSelectedYear}
-                compareYear={compareYear}
-                setCompareYear={setCompareYear}
-                yearComparison={yearComparison}
-                selectedEventId={selectedEventId}
-                setSelectedEventId={setSelectedEventId}
-                eventStats={eventStats}
-                eventStatsLoading={eventStatsLoading}
-                exportData={exportData}
-                exportLoading={exportLoading}
-                backupCreating={backupCreating}
-                backupRestoring={backupRestoring}
-                backupDeleting={backupDeleting}
-              /></div>}
-              {activeView === 'vendedor' && <div key="vendedor"><VendedorDashboardView
-                vendasVendedor={vendasVendedor}
-                setActiveView={setActiveView}
-                openJogoDetalhe={openJogoDetalhe}
-              /></div>}
+              {activeView === 'public' && <div key="public">{renderPublicGames()}</div>}
+              {activeView === 'my-games' && <div key="my-games">{renderMyGames()}</div>}
+              {activeView === 'admin' && <div key="admin">{renderAdmin()}</div>}
+              {activeView === 'vendedor' && <div key="vendedor">{renderVendedorDashboard()}</div>}
             </>
           )}
         </AnimatePresence>
@@ -3487,2963 +5324,89 @@ export default function DashboardPage() {
           <p className="mt-1">Sorteios transparentes e auditáveis</p>
         </div>
       </footer>
+      {/* Modals Refatorados */}
+      <AuthModal
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        authMode={authMode}
+        setAuthMode={setAuthMode}
+        authForm={authForm}
+        setAuthForm={setAuthForm}
+        handleAuth={handleAuth}
+        authLoading={authLoading}
+        handleQuickLogin={handleQuickLogin}
+      />
 
-      {/* Auth Modal */}
-      <AnimatePresence>
-        {authModalOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-            onClick={() => setAuthModalOpen(false)}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <Card className="w-full max-w-md">
-                <CardHeader className="relative">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-2 top-2"
-                    onClick={() => setAuthModalOpen(false)}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                  <CardTitle>{authMode === 'login' ? 'Entrar' : 'Criar Conta'}</CardTitle>
-                  <CardDescription>
-                    {authMode === 'login' 
-                      ? 'Entre para participar nos jogos'
-                      : 'Crie uma conta e comece a jogar'}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={handleAuth} className="space-y-4">
-                    {authMode === 'register' && (
-                      <div className="space-y-2">
-                        <Label htmlFor="nome">Nome</Label>
-                        <Input
-                          id="nome"
-                          placeholder="O seu nome"
-                          value={authForm.nome}
-                          onChange={(e) => setAuthForm({ ...authForm, nome: e.target.value })}
-                          required
-                        />
-                      </div>
-                    )}
-                    <div className="space-y-2">
-                      <Label htmlFor="email">Email</Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        placeholder="exemplo@email.com"
-                        value={authForm.email}
-                        onChange={(e) => setAuthForm({ ...authForm, email: e.target.value })}
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="password">Password</Label>
-                      <Input
-                        id="password"
-                        type="password"
-                        placeholder="••••••••"
-                        value={authForm.password}
-                        onChange={(e) => setAuthForm({ ...authForm, password: e.target.value })}
-                        required
-                      />
-                    </div>
-                    {authMode === 'register' && (
-                      <div className="space-y-2">
-                        <Label>Tipo de Conta</Label>
-                        <div className="grid grid-cols-2 gap-2">
-                          <Button
-                            type="button"
-                            variant={authForm.role === 'user' ? 'default' : 'outline'}
-                            onClick={() => setAuthForm({ ...authForm, role: 'user' })}
-                          >
-                            <Users className="h-4 w-4 mr-2" />
-                            Jogador
-                          </Button>
-                          <Button
-                            type="button"
-                            variant={authForm.role === 'aldeia_admin' ? 'default' : 'outline'}
-                            onClick={() => setAuthForm({ ...authForm, role: 'aldeia_admin' })}
-                          >
-                            <MapPin className="h-4 w-4 mr-2" />
-                            Organização
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                    {authMode === 'register' && authForm.role === 'aldeia_admin' && (
-                      <div className="space-y-2">
-                        <Label>Tipo de Organização</Label>
-                        <div className="grid grid-cols-2 gap-2">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant={authForm.tipoOrganizacao === 'aldeia' ? 'default' : 'outline'}
-                            onClick={() => setAuthForm({ ...authForm, tipoOrganizacao: 'aldeia' })}
-                            className="text-xs"
-                          >
-                            🏘️ Aldeia
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant={authForm.tipoOrganizacao === 'escola' ? 'default' : 'outline'}
-                            onClick={() => setAuthForm({ ...authForm, tipoOrganizacao: 'escola' })}
-                            className="text-xs"
-                          >
-                            🏫 Escola
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant={authForm.tipoOrganizacao === 'associacao_pais' ? 'default' : 'outline'}
-                            onClick={() => setAuthForm({ ...authForm, tipoOrganizacao: 'associacao_pais' })}
-                            className="text-xs"
-                          >
-                            👨‍👩‍👧‍👦 Assoc. Pais
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant={authForm.tipoOrganizacao === 'clube' ? 'default' : 'outline'}
-                            onClick={() => setAuthForm({ ...authForm, tipoOrganizacao: 'clube' })}
-                            className="text-xs"
-                          >
-                            ⚽ Clube
-                          </Button>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {authForm.tipoOrganizacao === 'aldeia' && 'Para aldeias e comunidades locais'}
-                          {authForm.tipoOrganizacao === 'escola' && 'Para escolas e instituições de ensino'}
-                          {authForm.tipoOrganizacao === 'associacao_pais' && 'Para associações de pais e encarregados'}
-                          {authForm.tipoOrganizacao === 'clube' && 'Para clubes desportivos e recreativos'}
-                        </p>
-                      </div>
-                    )}
-                    <Button type="submit" className="w-full" disabled={authLoading}>
-                      {authLoading ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          A processar...
-                        </>
-                      ) : (
-                        authMode === 'login' ? 'Entrar' : 'Criar Conta'
-                      )}
-                    </Button>
-                  </form>
-                  <div className="mt-4 text-center text-sm">
-                    <button
-                      className="text-green-600 hover:underline"
-                      onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')}
-                    >
-                      {authMode === 'login' 
-                        ? 'Não tem conta? Registe-se'
-                        : 'Já tem conta? Entre'}
-                    </button>
-                  </div>
+      <ParticiparModal
+        isOpen={participarModalOpen}
+        onClose={() => setParticiparModalOpen(false)}
+        jogoSelecionado={jogoSelecionado}
+        user={user}
+        step={step}
+        setStep={setStep}
+        numerosSelecionados={numerosSelecionados}
+        setNumerosSelecionados={setNumerosSelecionados}
+        coordenadasSelecionadas={coordenadasSelecionadas}
+        setCoordenadasSelecionadas={setCoordenadasSelecionadas}
+        quantidadeRaspadinha={quantidadeRaspadinha}
+        setQuantidadeRaspadinha={setQuantidadeRaspadinha}
+        metodoPagamento={metodoPagamento}
+        setMetodoPagamento={setMetodoPagamento}
+        telefoneMbway={telefoneMbway}
+        setTelefoneMbway={setTelefoneMbway}
+        adminParaCliente={adminParaCliente}
+        setAdminParaCliente={setAdminParaCliente}
+        nomeCliente={nomeCliente}
+        setNomeCliente={setNomeCliente}
+        telefoneCliente={telefoneCliente}
+        setTelefoneCliente={setTelefoneCliente}
+        emailCliente={emailCliente}
+        setEmailCliente={setEmailCliente}
+        identificacaoValida={identificacaoValida}
+        participacaoLoading={participacaoLoading}
+        handleParticipar={handleParticipar}
+        getComplianceText={getComplianceText}
+      />
 
-                  {/* Quick Login Buttons (Test Mode) */}
-                  {authMode === 'login' && (
-                    <div className="mt-4 pt-4 border-t">
-                      <p className="text-xs text-muted-foreground text-center mb-3">
-                        🔑 Login rápido para testes:
-                      </p>
-                      <div className="grid grid-cols-2 gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleQuickLogin('super_admin')}
-                          disabled={authLoading}
-                          className="text-xs"
-                        >
-                          <Crown className="h-3 w-3 mr-1 text-yellow-500" />
-                          Super Admin
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleQuickLogin('aldeia_admin')}
-                          disabled={authLoading}
-                          className="text-xs"
-                        >
-                          <MapPin className="h-3 w-3 mr-1 text-green-500" />
-                          Admin Aldeia
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleQuickLogin('vendedor')}
-                          disabled={authLoading}
-                          className="text-xs"
-                        >
-                          <ShoppingBag className="h-3 w-3 mr-1 text-blue-500" />
-                          Vendedor
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleQuickLogin('user')}
-                          disabled={authLoading}
-                          className="text-xs"
-                        >
-                          <Users className="h-3 w-3 mr-1 text-gray-500" />
-                          Jogador
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <CreateModal
+        isOpen={createModalOpen}
+        onClose={() => setCreateModalOpen(false)}
+        createType={createType}
+        createForm={createForm}
+        setCreateForm={setCreateForm}
+        handleCreate={handleCreate}
+        createLoading={createLoading}
+        aldeias={aldeias}
+        eventos={eventos}
+        premios={premios}
+        handleImageUpload={handleImageUpload}
+        aldeiaImageRef={aldeiaImageRef}
+        eventoImageRef={eventoImageRef}
+        stockInicial={stockInicial}
+        setStockInicial={setStockInicial}
+        premiosRaspadinha={premiosRaspadinha}
+        setPremiosRaspadinha={setPremiosRaspadinha}
+        limitePorUsuario={limitePorUsuario}
+        setLimitePorUsuario={setLimitePorUsuario}
+        novoPremioRaspadinha={novoPremioRaspadinha}
+        setNovoPremioRaspadinha={setNovoPremioRaspadinha}
+        addPremioRaspadinha={addPremioRaspadinha}
+        removePremioRaspadinha={removePremioRaspadinha}
+      />
 
-      {/* Wizard de Configuração Inicial */}
-      <AnimatePresence>
-        {wizardModalOpen && wizardData.organizacao && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-            onClick={() => setWizardModalOpen(false)}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-lg max-h-[90vh] overflow-y-auto"
-            >
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle className="flex items-center gap-2">
-                        <Sparkles className="h-5 w-5 text-yellow-500" />
-                        Configuração Inicial
-                      </CardTitle>
-                      <CardDescription>
-                        Configure a sua organização em poucos passos
-                      </CardDescription>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleSaveWizard(true)}
-                      disabled={wizardLoading}
-                      className="text-muted-foreground"
-                    >
-                      Saltar
-                    </Button>
-                  </div>
-
-                  {/* Progress Steps */}
-                  <div className="flex items-center gap-2 mt-4">
-                    {[1, 2, 3].map((s) => (
-                      <div key={s} className="flex items-center gap-1 flex-1">
-                        <div className={cn(
-                          "w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold",
-                          wizardStep >= s 
-                            ? "bg-green-500 text-white" 
-                            : "bg-gray-200 dark:bg-gray-700 text-gray-500"
-                        )}>
-                          {wizardStep > s ? <Check className="h-4 w-4" /> : s}
-                        </div>
-                        {s < 3 && (
-                          <div className={cn(
-                            "flex-1 h-1 rounded",
-                            wizardStep > s ? "bg-green-500" : "bg-gray-200 dark:bg-gray-700"
-                          )} />
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                  <div className="flex text-xs text-muted-foreground mt-1">
-                    <span className="flex-1">Geral</span>
-                    <span className="flex-1 text-center">Contacto</span>
-                    <span className="flex-1 text-right">Legal</span>
-                  </div>
-                </CardHeader>
-
-                <CardContent className="space-y-4">
-                  {/* Step 1: Informações Gerais */}
-                  {wizardStep === 1 && (
-                    <motion.div
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      className="space-y-4"
-                    >
-                      {/* Tipo Badge */}
-                      <div className="flex items-center gap-2 mb-4">
-                        <Badge className={cn(
-                          wizardData.organizacao.tipoOrganizacao === 'aldeia' && "bg-green-500",
-                          wizardData.organizacao.tipoOrganizacao === 'escola' && "bg-blue-500",
-                          wizardData.organizacao.tipoOrganizacao === 'associacao_pais' && "bg-purple-500",
-                          wizardData.organizacao.tipoOrganizacao === 'clube' && "bg-orange-500"
-                        )}>
-                          {wizardData.organizacao.tipoOrganizacao === 'aldeia' && '🏘️ Aldeia'}
-                          {wizardData.organizacao.tipoOrganizacao === 'escola' && '🏫 Escola'}
-                          {wizardData.organizacao.tipoOrganizacao === 'associacao_pais' && '👨‍👩‍👧‍👦 Assoc. Pais'}
-                          {wizardData.organizacao.tipoOrganizacao === 'clube' && '⚽ Clube'}
-                        </Badge>
-                        <span className="text-sm text-muted-foreground">
-                          {wizardData.organizacao.nome}
-                        </span>
-                      </div>
-
-                      {/* Logo Upload */}
-                      <div className="space-y-2">
-                        <Label>Logo da Organização</Label>
-                        <div className="flex items-center gap-4">
-                          {wizardData.logoBase64 ? (
-                            <div className="relative">
-                              <img 
-                                src={wizardData.logoBase64} 
-                                alt="Logo" 
-                                className="w-16 h-16 rounded-lg object-cover border"
-                              />
-                              <Button
-                                variant="destructive"
-                                size="icon"
-                                className="absolute -top-2 -right-2 h-5 w-5"
-                                onClick={() => setWizardData({ ...wizardData, logoBase64: '' })}
-                              >
-                                <X className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          ) : (
-                            <div 
-                              className="w-16 h-16 rounded-lg border-2 border-dashed flex items-center justify-center cursor-pointer hover:border-green-500 transition-colors"
-                              onClick={() => wizardLogoRef.current?.click()}
-                            >
-                              <Upload className="h-6 w-6 text-muted-foreground" />
-                            </div>
-                          )}
-                          <div className="flex-1">
-                            <input
-                              ref={wizardLogoRef}
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              onChange={handleWizardLogoUpload}
-                            />
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => wizardLogoRef.current?.click()}
-                            >
-                              Carregar Logo
-                            </Button>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              PNG, JPG até 5MB
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Descrição */}
-                      <div className="space-y-2">
-                        <Label htmlFor="descricao">Descrição</Label>
-                        <Input
-                          id="descricao"
-                          placeholder="Descreva brevemente a sua organização"
-                          value={wizardData.descricao}
-                          onChange={(e) => setWizardData({ ...wizardData, descricao: e.target.value })}
-                        />
-                      </div>
-
-                      {/* Campos específicos para escolas */}
-                      {wizardData.organizacao.tipoOrganizacao === 'escola' && (
-                        <>
-                          <div className="space-y-2">
-                            <Label htmlFor="nomeEscola">Nome da Escola</Label>
-                            <Input
-                              id="nomeEscola"
-                              placeholder="Nome oficial da escola"
-                              value={wizardData.nomeEscola}
-                              onChange={(e) => setWizardData({ ...wizardData, nomeEscola: e.target.value })}
-                            />
-                          </div>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="codigoEscola">Código da Escola</Label>
-                              <Input
-                                id="codigoEscola"
-                                placeholder="Ex: 123456"
-                                value={wizardData.codigoEscola}
-                                onChange={(e) => setWizardData({ ...wizardData, codigoEscola: e.target.value })}
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="nivelEnsino">Nível de Ensino</Label>
-                              <select
-                                id="nivelEnsino"
-                                className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
-                                value={wizardData.nivelEnsino}
-                                onChange={(e) => setWizardData({ ...wizardData, nivelEnsino: e.target.value })}
-                              >
-                                <option value="">Selecionar...</option>
-                                <option value="pre_escola">Pré-Escola</option>
-                                <option value="1_ciclo">1º Ciclo</option>
-                                <option value="2_ciclo">2º Ciclo</option>
-                                <option value="3_ciclo">3º Ciclo</option>
-                                <option value="secundario">Secundário</option>
-                                <option value="profissional">Profissional</option>
-                                <option value="superior">Superior</option>
-                              </select>
-                            </div>
-                          </div>
-                        </>
-                      )}
-
-                      {/* Nível de ensino para associações de pais */}
-                      {wizardData.organizacao.tipoOrganizacao === 'associacao_pais' && (
-                        <div className="space-y-2">
-                          <Label htmlFor="nivelEnsinoAp">Nível de Ensino Associado</Label>
-                          <select
-                            id="nivelEnsinoAp"
-                            className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
-                            value={wizardData.nivelEnsino}
-                            onChange={(e) => setWizardData({ ...wizardData, nivelEnsino: e.target.value })}
-                          >
-                            <option value="">Selecionar...</option>
-                            <option value="pre_escola">Pré-Escola</option>
-                            <option value="1_ciclo">1º Ciclo</option>
-                            <option value="2_ciclo">2º Ciclo</option>
-                            <option value="3_ciclo">3º Ciclo</option>
-                            <option value="secundario">Secundário</option>
-                          </select>
-                        </div>
-                      )}
-                    </motion.div>
-                  )}
-
-                  {/* Step 2: Contactos e Localização */}
-                  {wizardStep === 2 && (
-                    <motion.div
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      className="space-y-4"
-                    >
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="responsavel">Responsável</Label>
-                          <Input
-                            id="responsavel"
-                            placeholder="Nome do responsável"
-                            value={wizardData.responsavel}
-                            onChange={(e) => setWizardData({ ...wizardData, responsavel: e.target.value })}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="contactoResponsavel">Contacto</Label>
-                          <Input
-                            id="contactoResponsavel"
-                            placeholder="Telefone ou email"
-                            value={wizardData.contactoResponsavel}
-                            onChange={(e) => setWizardData({ ...wizardData, contactoResponsavel: e.target.value })}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="morada">Morada</Label>
-                        <Input
-                          id="morada"
-                          placeholder="Rua, número, andar..."
-                          value={wizardData.morada}
-                          onChange={(e) => setWizardData({ ...wizardData, morada: e.target.value })}
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="codigoPostal">Código Postal</Label>
-                          <Input
-                            id="codigoPostal"
-                            placeholder="0000-000"
-                            value={wizardData.codigoPostal}
-                            onChange={(e) => setWizardData({ ...wizardData, codigoPostal: e.target.value })}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="localidade">Localidade</Label>
-                          <Input
-                            id="localidade"
-                            placeholder="Cidade ou vila"
-                            value={wizardData.localidade}
-                            onChange={(e) => setWizardData({ ...wizardData, localidade: e.target.value })}
-                          />
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
-
-                  {/* Step 3: Conformidade Legal */}
-                  {wizardStep === 3 && (
-                    <motion.div
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      className="space-y-4"
-                    >
-                      <div className="p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
-                        <div className="flex items-start gap-3">
-                          <Shield className="h-5 w-5 text-blue-500 mt-0.5" />
-                          <div>
-                            <p className="font-medium text-blue-700 dark:text-blue-300">Conformidade Legal</p>
-                            <p className="text-sm text-blue-600 dark:text-blue-400">
-                              Para jogos de sorteio com prémios, pode ser necessária autorização da Câmara Municipal.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between p-4 border rounded-lg">
-                        <div className="space-y-0.5">
-                          <Label htmlFor="autorizacaoCM">Autorização da Câmara Municipal</Label>
-                          <p className="text-xs text-muted-foreground">
-                            Indique se possui autorização para realizar eventos de angariação
-                          </p>
-                        </div>
-                        <Switch
-                          id="autorizacaoCM"
-                          checked={wizardData.autorizacaoCM}
-                          onCheckedChange={(checked) => setWizardData({ ...wizardData, autorizacaoCM: checked })}
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="numeroAlvara">Número de Alvará (opcional)</Label>
-                        <Input
-                          id="numeroAlvara"
-                          placeholder="Número do alvará, se aplicável"
-                          value={wizardData.numeroAlvara}
-                          onChange={(e) => setWizardData({ ...wizardData, numeroAlvara: e.target.value })}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          Alvará de atividade ou licença específica para eventos
-                        </p>
-                      </div>
-                    </motion.div>
-                  )}
-                </CardContent>
-
-                <CardFooter className="flex justify-between">
-                  <Button
-                    variant="outline"
-                    onClick={() => wizardStep > 1 ? setWizardStep(wizardStep - 1) : setWizardModalOpen(false)}
-                    disabled={wizardLoading}
-                  >
-                    {wizardStep > 1 ? 'Anterior' : 'Cancelar'}
-                  </Button>
-                  
-                  {wizardStep < 3 ? (
-                    <Button
-                      onClick={() => setWizardStep(wizardStep + 1)}
-                      className="bg-green-600 hover:bg-green-700"
-                    >
-                      Próximo
-                    </Button>
-                  ) : (
-                    <Button
-                      onClick={() => handleSaveWizard(false)}
-                      disabled={wizardLoading}
-                      className="bg-green-600 hover:bg-green-700"
-                    >
-                      {wizardLoading ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          A guardar...
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle2 className="mr-2 h-4 w-4" />
-                          Concluir
-                        </>
-                      )}
-                    </Button>
-                  )}
-                </CardFooter>
-              </Card>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Participar Modal */}
-      <AnimatePresence>
-        {participarModalOpen && jogoSelecionado && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-            onClick={() => setParticiparModalOpen(false)}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-2xl max-h-[90vh] overflow-y-auto"
-            >
-              <Card>
-                <CardHeader className="relative">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-2 top-2"
-                    onClick={() => setParticiparModalOpen(false)}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                  <CardTitle className="flex items-center gap-2">
-                    <span className="text-2xl">
-                      {GAME_TYPES[jogoSelecionado.tipo as keyof typeof GAME_TYPES]?.emoji}
-                    </span>
-                    Participar em {jogoSelecionado.tipo.replace('_', ' ')}
-                  </CardTitle>
-                  <CardDescription>
-                    {jogoSelecionado.evento?.aldeia?.nome} • {jogoSelecionado.evento?.nome}
-                  </CardDescription>
-                  
-                  {/* Progress Steps */}
-                  <div className="flex items-center gap-2 mt-4">
-                    <div className={cn(
-                      "flex items-center gap-2 px-3 py-1 rounded-full text-sm",
-                      step === 'select' ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
-                    )}>
-                      <span className="w-5 h-5 rounded-full bg-current flex items-center justify-center text-white text-xs font-bold">1</span>
-                      Seleção
-                    </div>
-                    <div className="h-px flex-1 bg-gray-200" />
-                    <div className={cn(
-                      "flex items-center gap-2 px-3 py-1 rounded-full text-sm",
-                      step === 'payment' ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
-                    )}>
-                      <span className="w-5 h-5 rounded-full bg-current flex items-center justify-center text-white text-xs font-bold">2</span>
-                      Pagamento
-                    </div>
-                  </div>
-                </CardHeader>
-                
-                <CardContent className="space-y-4">
-                  {/* Aviso Legal com Conformidade */}
-                  <div className="p-3 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
-                    <div className="flex items-start gap-2">
-                      <Shield className="h-4 w-4 text-blue-600 mt-0.5" />
-                      <div className="text-xs text-blue-700 dark:text-blue-300">
-                        <p className="font-semibold mb-1">Informação Legal</p>
-                        {getComplianceText(jogoSelecionado.evento?.aldeia) || (
-                          <p>Este jogo é organizado por {jogoSelecionado.evento?.aldeia?.nome || 'uma organização registada'} para angariação de fundos. O sorteio é realizado de forma transparente e verificável.</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* Step 1: Selection */}
-                  {step === 'select' && (
-                    <>
-                      <div className="flex justify-between items-center p-3 bg-muted/50 rounded-lg">
-                        <div>
-                          <p className="text-sm text-muted-foreground">Preço por participação</p>
-                          <p className="text-2xl font-bold text-green-600">{jogoSelecionado.precoParticipacao}€</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm text-muted-foreground">Participações</p>
-                          <p className="text-2xl font-bold">{jogoSelecionado._count?.participacoes || 0}</p>
-                        </div>
-                      </div>
-
-                      <div className="border rounded-lg p-4 max-h-[250px] overflow-auto">
-                        {/* === RASPADINHA === */}
-                        {jogoSelecionado.tipo === 'raspadinha' && (
-                          <div className="space-y-4">
-                            {/* Stock Info */}
-                            <div className="flex items-center justify-between p-3 bg-amber-50 dark:bg-amber-950 rounded-lg border border-amber-200 dark:border-amber-800">
-                              <div className="flex items-center gap-3">
-                                <Sparkles className="h-6 w-6 text-amber-600" />
-                                <div>
-                                  <p className="text-sm text-amber-700 dark:text-amber-300">Cartões Disponíveis</p>
-                                  <p className="text-xl font-bold text-amber-800 dark:text-amber-200">
-                                    {jogoSelecionado.stockRestante || 0} / {jogoSelecionado.stockInicial || 0}
-                                  </p>
-                                </div>
-                              </div>
-                              <Badge className={(jogoSelecionado.stockRestante || 0) > 0 ? "bg-green-500" : "bg-red-500"}>
-                                {(jogoSelecionado.stockRestante || 0) > 0 ? 'Disponível' : 'Esgotado'}
-                              </Badge>
-                            </div>
-
-                            {/* Prémios */}
-                            {jogoSelecionado.premiosRaspadinha && (
-                              <div>
-                                <p className="text-sm font-semibold mb-2 flex items-center gap-2">
-                                  <Gift className="h-4 w-4" />
-                                  Prémios Disponíveis
-                                </p>
-                                <div className="grid grid-cols-2 gap-2">
-                                  {(typeof jogoSelecionado.premiosRaspadinha === 'string' 
-                                    ? JSON.parse(jogoSelecionado.premiosRaspadinha) 
-                                    : jogoSelecionado.premiosRaspadinha
-                                  ).map((premio: any, idx: number) => (
-                                    <div key={idx} className="flex items-center justify-between p-2 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded text-sm">
-                                      <div>
-                                        <span className="font-medium">{premio.nome}</span>
-                                        <span className="text-amber-600 dark:text-amber-400 ml-1">({premio.valor}€)</span>
-                                      </div>
-                                      <Badge variant="outline" className="text-xs bg-amber-100 dark:bg-amber-900">
-                                        {premio.quantidade}x
-                                      </Badge>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Quantidade */}
-                            <div>
-                              <Label className="font-semibold">Quantidade de cartões:</Label>
-                              <div className="flex items-center gap-3 mt-2">
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="icon"
-                                  onClick={() => setQuantidadeRaspadinha(Math.max(1, quantidadeRaspadinha - 1))}
-                                  disabled={quantidadeRaspadinha <= 1}
-                                >
-                                  <Minus className="h-4 w-4" />
-                                </Button>
-                                <Input
-                                  type="number"
-                                  min="1"
-                                  max={Math.min(
-                                    jogoSelecionado.stockRestante || 100,
-                                    jogoSelecionado.limitePorUsuario || 100
-                                  )}
-                                  value={quantidadeRaspadinha}
-                                  onChange={(e) => {
-                                    const max = Math.min(
-                                      jogoSelecionado.stockRestante || 100,
-                                      jogoSelecionado.limitePorUsuario || 100
-                                    );
-                                    const val = parseInt(e.target.value) || 1;
-                                    setQuantidadeRaspadinha(Math.min(max, Math.max(1, val)));
-                                  }}
-                                  className="w-20 text-center text-xl font-bold"
-                                />
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="icon"
-                                  onClick={() => {
-                                    const max = Math.min(
-                                      jogoSelecionado.stockRestante || 100,
-                                      jogoSelecionado.limitePorUsuario || 100
-                                    );
-                                    setQuantidadeRaspadinha(Math.min(max, quantidadeRaspadinha + 1));
-                                  }}
-                                  disabled={quantidadeRaspadinha >= Math.min(
-                                    jogoSelecionado.stockRestante || 100,
-                                    jogoSelecionado.limitePorUsuario || 100
-                                  )}
-                                >
-                                  <Plus className="h-4 w-4" />
-                                </Button>
-                              </div>
-                              {jogoSelecionado.limitePorUsuario && (
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  Limite: {jogoSelecionado.limitePorUsuario} cartões por pessoa
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* === OUTROS JOGOS === */}
-                        {jogoSelecionado.tipo !== 'raspadinha' && (
-                          <>
-                            <p className="text-sm text-muted-foreground mb-4 text-center">
-                              {jogoSelecionado.tipo === 'poio_vaca' 
-                                ? 'Selecione uma coordenada no grid:' 
-                                : 'Selecione um número:'}
-                            </p>
-                            
-                            {jogoSelecionado.tipo === 'poio_vaca' && renderPoioVacaGrid(jogoSelecionado, true)}
-                        {jogoSelecionado.tipo === 'rifa' && (
-                          <RifaNumberSelector 
-                            jogo={jogoSelecionado} 
-                            selected={dadosParticipacao?.numero}
-                            onSelect={(num) => setDadosParticipacao({ numero: num })}
-                            ocupados={ocupados.map(o => o.numero)}
-                            loading={loadingOcupados}
-                            multiSelect={true}
-                            selectedNumbers={numerosSelecionados}
-                            onToggleNumber={(num) => {
-                              if (numerosSelecionados.includes(num)) {
-                                setNumerosSelecionados(prev => prev.filter(n => n !== num));
-                              } else if (numerosSelecionados.length < 10) {
-                                setNumerosSelecionados(prev => [...prev, num]);
-                              }
-                            }}
-                            maxNumbers={10}
-                            meusNumeros={participacoesJogo.filter(p => p.userId === user?.id).map(p => p.dadosParticipacao.numero)}
-                            participacoesJogo={participacoesJogo}
-                            onOccupiedClick={(num) => handlePosicaoClick({ numero: num }, ['super_admin', 'aldeia_admin', 'vendedor'].includes(user?.role || ''))}
-                            isAdminOrVendedor={user ? ['super_admin', 'aldeia_admin', 'vendedor'].includes(user.role) : false}
-                          />
-                        )}
-                        {jogoSelecionado.tipo === 'tombola' && (
-                          <RifaNumberSelector 
-                            jogo={jogoSelecionado} 
-                            selected={dadosParticipacao?.numero}
-                            onSelect={(num) => setDadosParticipacao({ numero: num })}
-                            ocupados={ocupados.map(o => o.numero)}
-                            loading={loadingOcupados}
-                            multiSelect={true}
-                            selectedNumbers={numerosSelecionados}
-                            onToggleNumber={(num) => {
-                              if (numerosSelecionados.includes(num)) {
-                                setNumerosSelecionados(prev => prev.filter(n => n !== num));
-                              } else if (numerosSelecionados.length < 10) {
-                                setNumerosSelecionados(prev => [...prev, num]);
-                              }
-                            }}
-                            maxNumbers={10}
-                            meusNumeros={participacoesJogo.filter(p => p.userId === user?.id).map(p => p.dadosParticipacao.numero)}
-                            participacoesJogo={participacoesJogo}
-                            onOccupiedClick={(num) => handlePosicaoClick({ numero: num }, ['super_admin', 'aldeia_admin', 'vendedor'].includes(user?.role || ''))}
-                            isAdminOrVendedor={user ? ['super_admin', 'aldeia_admin', 'vendedor'].includes(user.role) : false}
-                          />
-                        )}
-                          </>
-                        )}
-                      </div>
-
-                      {/* Seleção - Mostrar resumo */}
-                      {jogoSelecionado.tipo === 'raspadinha' && quantidadeRaspadinha > 0 && (
-                        <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                          <div className="flex items-center justify-between mb-2">
-                            <p className="text-sm text-amber-700 font-medium">
-                              {quantidadeRaspadinha} cartão{quantidadeRaspadinha > 1 ? 's' : ''} selecionado{quantidadeRaspadinha > 1 ? 's' : ''}:
-                            </p>
-                            <p className="text-sm font-bold text-amber-700">
-                              Total: {(quantidadeRaspadinha * jogoSelecionado.precoParticipacao).toFixed(2)}€
-                            </p>
-                          </div>
-                        </div>
-                      )}
-                      {jogoSelecionado.tipo === 'poio_vaca' && coordenadasSelecionadas.length > 0 && (
-                        <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-                          <div className="flex items-center justify-between mb-2">
-                            <p className="text-sm text-green-700 font-medium">
-                              {coordenadasSelecionadas.length} coordenada{coordenadasSelecionadas.length > 1 ? 's' : ''} selecionada{coordenadasSelecionadas.length > 1 ? 's' : ''}:
-                            </p>
-                            <p className="text-sm font-bold text-green-700">
-                              Total: {(coordenadasSelecionadas.length * jogoSelecionado.precoParticipacao).toFixed(2)}€
-                            </p>
-                          </div>
-                          <div className="flex flex-wrap gap-1">
-                            {coordenadasSelecionadas.map((c, i) => (
-                              <span key={i} className="px-2 py-1 bg-green-200 text-green-800 rounded text-sm font-medium">
-                                {c.letra}{c.numero}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      {['rifa', 'tombola'].includes(jogoSelecionado.tipo) && numerosSelecionados.length > 0 && (
-                        <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-                          <div className="flex items-center justify-between mb-2">
-                            <p className="text-sm text-green-700 font-medium">
-                              {numerosSelecionados.length} número{numerosSelecionados.length > 1 ? 's' : ''} selecionado{numerosSelecionados.length > 1 ? 's' : ''}:
-                            </p>
-                            <p className="text-sm font-bold text-green-700">
-                              Total: {(numerosSelecionados.length * jogoSelecionado.precoParticipacao).toFixed(2)}€
-                            </p>
-                          </div>
-                          <div className="flex flex-wrap gap-1">
-                            {numerosSelecionados.sort((a, b) => a - b).map(n => (
-                              <span key={n} className="px-2 py-1 bg-green-200 text-green-800 rounded text-sm font-medium">
-                                {n}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  )}
-
-                  {/* Step 2: Payment */}
-                  {step === 'payment' && (
-                    <>
-                      <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                        <p className="text-sm text-green-700">Participação selecionada:</p>
-                        {jogoSelecionado.tipo === 'raspadinha' ? (
-                          <div>
-                            <p className="text-xl font-bold text-green-700">
-                              {quantidadeRaspadinha} cartão{quantidadeRaspadinha > 1 ? 's' : ''} de raspadinha
-                            </p>
-                          </div>
-                        ) : jogoSelecionado.tipo === 'poio_vaca' ? (
-                          <div>
-                            <p className="text-xl font-bold text-green-700">
-                              {coordenadasSelecionadas.length} coordenada{coordenadasSelecionadas.length > 1 ? 's' : ''}: {coordenadasSelecionadas.map(c => `${c.letra}${c.numero}`).join(', ')}
-                            </p>
-                          </div>
-                        ) : (
-                          <div>
-                            <p className="text-xl font-bold text-green-700">
-                              {numerosSelecionados.length} número{numerosSelecionados.length > 1 ? 's' : ''}: {numerosSelecionados.sort((a, b) => a - b).join(', ')}
-                            </p>
-                          </div>
-                        )}
-                        <p className="text-lg font-bold text-green-600 mt-2">
-                          Total: {((jogoSelecionado.tipo === 'raspadinha' 
-                            ? quantidadeRaspadinha 
-                            : jogoSelecionado.tipo === 'poio_vaca' 
-                              ? coordenadasSelecionadas.length 
-                              : numerosSelecionados.length) * jogoSelecionado.precoParticipacao).toFixed(2)}€
-                        </p>
-                      </div>
-
-                      {/* Admin: opção de registar para cliente */}
-                      {user && ['super_admin', 'aldeia_admin', 'vendedor'].includes(user.role) && (
-                        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="flex items-center gap-2">
-                              <Users className="w-4 h-4 text-blue-600" />
-                              <span className="text-sm font-medium text-blue-700">Registar para cliente</span>
-                            </div>
-                            <label className="relative inline-flex items-center cursor-pointer">
-                              <input 
-                                type="checkbox" 
-                                checked={adminParaCliente} 
-                                onChange={(e) => setAdminParaCliente(e.target.checked)}
-                                className="sr-only peer" 
-                              />
-                              <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-500"></div>
-                            </label>
-                          </div>
-                          {adminParaCliente && (
-                            <div className="space-y-3">
-                              <div>
-                                <Label className="text-xs text-blue-600 mb-1 block">Nome do cliente *</Label>
-                                <Input
-                                  placeholder="Nome completo"
-                                  value={nomeCliente}
-                                  onChange={(e) => setNomeCliente(e.target.value)}
-                                  className="bg-white"
-                                />
-                              </div>
-                              <div className="p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-700">
-                                ⚠️ É obrigatório indicar telemóvel <strong>OU</strong> email para identificar o cliente
-                              </div>
-                              <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                  <Label className="text-xs text-blue-600 mb-1 block">Telemóvel</Label>
-                                  <Input
-                                    type="tel"
-                                    placeholder="912345678"
-                                    value={telefoneCliente}
-                                    onChange={(e) => setTelefoneCliente(e.target.value.replace(/\D/g, '').slice(0, 9))}
-                                    className="bg-white"
-                                    maxLength={9}
-                                  />
-                                </div>
-                                <div>
-                                  <Label className="text-xs text-blue-600 mb-1 block">Email</Label>
-                                  <Input
-                                    type="email"
-                                    placeholder="email@exemplo.com"
-                                    value={emailCliente}
-                                    onChange={(e) => setEmailCliente(e.target.value)}
-                                    className="bg-white"
-                                  />
-                                </div>
-                              </div>
-                              {nomeCliente.trim() && (telefoneCliente.trim().length >= 9 || emailCliente.trim()) && (
-                                <div className="flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded text-xs text-green-700">
-                                  <CheckCircle2 className="w-4 h-4" />
-                                  Identificação válida: {nomeCliente}
-                                  {telefoneCliente && ` • ${telefoneCliente}`}
-                                  {emailCliente && ` • ${emailCliente}`}
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      <div className="space-y-4">
-                        <Label className="text-base font-semibold">Método de Pagamento</Label>
-                        
-                        {/* Dinheiro para Admin e Vendedor */}
-                        {user && ['super_admin', 'aldeia_admin', 'vendedor'].includes(user.role) && (
-                          <div className="grid grid-cols-2 gap-4">
-                            <button
-                              type="button"
-                              onClick={() => setMetodoPagamento('dinheiro')}
-                              className={cn(
-                                "p-4 border-2 rounded-xl text-left transition-all",
-                                metodoPagamento === 'dinheiro' 
-                                  ? "border-green-500 bg-green-50" 
-                                  : "border-gray-200 hover:border-gray-300"
-                              )}
-                            >
-                              <div className="flex items-center gap-3">
-                                <div className={cn(
-                                  "w-10 h-10 rounded-full flex items-center justify-center",
-                                  metodoPagamento === 'dinheiro' ? "bg-green-500 text-white" : "bg-gray-100"
-                                )}>
-                                  <span className="text-xl">💵</span>
-                                </div>
-                                <div>
-                                  <p className="font-semibold">Dinheiro</p>
-                                  <p className="text-xs text-muted-foreground">No tablet</p>
-                                </div>
-                              </div>
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => setMetodoPagamento('mbway')}
-                              className={cn(
-                                "p-4 border-2 rounded-xl text-left transition-all",
-                                metodoPagamento === 'mbway' 
-                                  ? "border-green-500 bg-green-50" 
-                                  : "border-gray-200 hover:border-gray-300"
-                              )}
-                            >
-                              <div className="flex items-center gap-3">
-                                <div className={cn(
-                                  "w-10 h-10 rounded-full flex items-center justify-center",
-                                  metodoPagamento === 'mbway' ? "bg-green-500 text-white" : "bg-gray-100"
-                                )}>
-                                  <span className="text-xl">📱</span>
-                                </div>
-                                <div>
-                                  <p className="font-semibold">MBWay</p>
-                                  <p className="text-xs text-muted-foreground">Pagamento móvel</p>
-                                </div>
-                              </div>
-                            </button>
-                          </div>
-                        )}
-                        
-                        {/* Utilizador normal: apenas MBWay */}
-                        {user && !['super_admin', 'aldeia_admin', 'vendedor'].includes(user.role) && (
-                          <div className="p-4 bg-purple-50 border border-purple-200 rounded-xl">
-                            <div className="flex items-center gap-3">
-                              <div className="w-12 h-12 rounded-full bg-purple-500 text-white flex items-center justify-center">
-                                <span className="text-2xl">📱</span>
-                              </div>
-                              <div>
-                                <p className="font-semibold text-purple-700">Pagamento por MBWay</p>
-                                <p className="text-sm text-purple-600">Introduza o seu número de telemóvel</p>
-                              </div>
-                            </div>
-                            <Input
-                              type="tel"
-                              placeholder="912345678"
-                              value={telefoneMbway}
-                              onChange={(e) => setTelefoneMbway(e.target.value.replace(/\D/g, '').slice(0, 9))}
-                              className="mt-3 bg-white"
-                              maxLength={9}
-                            />
-                          </div>
-                        )}
-
-                        {/* MBWay phone input para admins/vendedores que escolhem MBWay */}
-                        {metodoPagamento === 'mbway' && user && ['super_admin', 'aldeia_admin', 'vendedor'].includes(user.role) && (
-                          <motion.div
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: 'auto' }}
-                            className="space-y-2"
-                          >
-                            <Label htmlFor="telefone">Número de Telemóvel do Cliente *</Label>
-                            <Input
-                              id="telefone"
-                              type="tel"
-                              placeholder="912345678"
-                              value={telefoneMbway}
-                              onChange={(e) => setTelefoneMbway(e.target.value.replace(/\D/g, '').slice(0, 9))}
-                              className="text-lg"
-                            />
-                            <p className="text-xs text-muted-foreground">
-                              Número do cliente para pagamento MBWay
-                            </p>
-                          </motion.div>
-                        )}
-
-                        {metodoPagamento === 'dinheiro' && (
-                          <motion.div
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: 'auto' }}
-                            className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg"
-                          >
-                            <p className="text-sm text-yellow-800">
-                              <strong>💵 Pagamento no Tablet</strong><br />
-                              O cliente paga em dinheiro ao administrador. O pagamento é registado automaticamente.
-                            </p>
-                          </motion.div>
-                        )}
-
-                        {metodoPagamento === 'mbway' && telefoneMbway.length === 9 && (
-                          <motion.div
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: 'auto' }}
-                            className="p-4 bg-blue-50 border border-blue-200 rounded-lg"
-                          >
-                            <p className="text-sm text-blue-800">
-                              <strong>📱 Pagamento MBWay</strong><br />
-                              Após confirmar, será enviada uma notificação MBWay para autorizar o pagamento.
-                            </p>
-                          </motion.div>
-                        )}
-                      </div>
-                    </>
-                  )}
-                </CardContent>
-                
-                <CardFooter className="gap-2">
-                  {step === 'select' && (
-                    <>
-                      <Button 
-                        variant="outline" 
-                        className="flex-1"
-                        onClick={() => setParticiparModalOpen(false)}
-                      >
-                        Cancelar
-                      </Button>
-                      <Button 
-                        className="flex-1 gap-2"
-                        disabled={
-                          jogoSelecionado.tipo === 'raspadinha'
-                            ? quantidadeRaspadinha < 1 || (jogoSelecionado.stockRestante || 0) < 1
-                            : jogoSelecionado.tipo === 'poio_vaca' 
-                              ? coordenadasSelecionadas.length === 0
-                              : numerosSelecionados.length === 0
-                        }
-                        onClick={() => setStep('payment')}
-                      >
-                        Continuar {jogoSelecionado.tipo === 'raspadinha'
-                          ? quantidadeRaspadinha > 0 && `(${quantidadeRaspadinha})`
-                          : jogoSelecionado.tipo === 'poio_vaca' 
-                            ? coordenadasSelecionadas.length > 0 && `(${coordenadasSelecionadas.length})`
-                            : numerosSelecionados.length > 0 && `(${numerosSelecionados.length})`
-                        }
-                      </Button>
-                    </>
-                  )}
-                  
-                  {step === 'payment' && (
-                    <>
-                      <Button 
-                        variant="outline" 
-                        className="flex-1"
-                        onClick={() => setStep('select')}
-                      >
-                        Voltar
-                      </Button>
-                      <Button 
-                        className="flex-1 gap-2"
-                        disabled={
-                          participacaoLoading || 
-                          (metodoPagamento === 'mbway' && telefoneMbway.length !== 9) ||
-                          (adminParaCliente && (!nomeCliente.trim() || (!telefoneCliente.trim() && !emailCliente.trim())))
-                        }
-                        onClick={handleParticipar}
-                      >
-                        {participacaoLoading ? (
-                          <>
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                            A processar...
-                          </>
-                        ) : (
-                          <>
-                            <CheckCircle2 className="h-4 w-4" />
-                            Confirmar ({((jogoSelecionado.tipo === 'raspadinha' 
-                              ? quantidadeRaspadinha 
-                              : jogoSelecionado.tipo === 'poio_vaca' 
-                                ? coordenadasSelecionadas.length 
-                                : numerosSelecionados.length) * jogoSelecionado.precoParticipacao).toFixed(2)}€)
-                          </>
-                        )}
-                      </Button>
-                    </>
-                  )}
-                </CardFooter>
-              </Card>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Raspadinha Modal - Revelar Cartões */}
-      <AnimatePresence>
-        {raspadinhaModalOpen && participacoesRaspadinha.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-            onClick={() => setRaspadinhaModalOpen(false)}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-4xl max-h-[90vh] overflow-y-auto"
-            >
-              <Card>
-                <CardHeader className="relative">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-2 top-2"
-                    onClick={() => setRaspadinhaModalOpen(false)}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                  <CardTitle className="flex items-center gap-2">
-                    <Sparkles className="h-5 w-5 text-amber-500" />
-                    Os Seus Cartões Raspadinha
-                  </CardTitle>
-                  <CardDescription>
-                    {jogoRaspadinha?.evento?.aldeia?.nome} • {jogoRaspadinha?.evento?.nome}
-                  </CardDescription>
-                </CardHeader>
-                
-                <CardContent>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                    {participacoesRaspadinha.map((participacao) => {
-                      const isRevelada = raspadinhasReveladas.has(participacao.id);
-                      const resultado = raspadinhasReveladas.get(participacao.id);
-                      const isRevelando = revelandoRaspadinha === participacao.id;
-                      const isWinner = resultado?.isWinner;
-                      
-                      return (
-                        <ScratchCard
-                          key={participacao.id}
-                          participacaoId={participacao.id}
-                          numeroCartao={participacao.numeroCartao}
-                          isRevelada={isRevelada}
-                          isRevelando={isRevelando}
-                          resultado={resultado}
-                          onReveal={handleRevelarRaspadinha}
-                        />
-                      );
-                    })}
-                  </div>
-                  
-                  {/* Summary */}
-                  {raspadinhasReveladas.size > 0 && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="mt-6 p-4 bg-muted rounded-lg"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm text-muted-foreground">Cartões revelados</p>
-                          <p className="font-bold">{raspadinhasReveladas.size} / {participacoesRaspadinha.length}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm text-muted-foreground">Prémios ganhos</p>
-                          <p className="font-bold text-yellow-600">
-                            {Array.from(raspadinhasReveladas.values()).filter((r: any) => r?.isWinner).length} prémio(s)
-                          </p>
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
-                </CardContent>
-                
-                <CardFooter className="gap-2">
-                  <Button 
-                    variant="outline" 
-                    className="flex-1"
-                    onClick={() => setRaspadinhaModalOpen(false)}
-                  >
-                    Fechar
-                  </Button>
-                  {raspadinhasReveladas.size === participacoesRaspadinha.length && (
-                    <Button 
-                      className="flex-1 gap-2"
-                      onClick={() => {
-                        setRaspadinhaModalOpen(false);
-                        setActiveView('my-games');
-                      }}
-                    >
-                      Ver Minhas Participações
-                    </Button>
-                  )}
-                </CardFooter>
-              </Card>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Alterar Participação Modal */}
-      <AnimatePresence>
-        {alterarModalOpen && participacaoParaAlterar && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-            onClick={() => setAlterarModalOpen(false)}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-md"
-            >
-              <Card>
-                <CardHeader className="relative">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-2 top-2"
-                    onClick={() => setAlterarModalOpen(false)}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                  <CardTitle className="flex items-center gap-2">
-                    <Settings className="h-5 w-5" />
-                    Gerir Participação
-                  </CardTitle>
-                  <CardDescription>
-                    {participacaoParaAlterar.jogo?.tipo === 'poio_vaca' 
-                      ? `Coordenada: ${participacaoParaAlterar.dadosParticipacao?.letra}${participacaoParaAlterar.dadosParticipacao?.numero}`
-                      : `Número: ${participacaoParaAlterar.dadosParticipacao?.numero}`
-                    } • {participacaoParaAlterar.nomeCliente || participacaoParaAlterar.user?.nome || 'Cliente'}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Tipo de Ação */}
-                  <div className="space-y-2">
-                    <Label className="text-base font-semibold">Escolha a ação:</Label>
-                    <div className="grid grid-cols-2 gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setAlterarForm({ ...alterarForm, tipoAlteracao: 'trocar' })}
-                        className={cn(
-                          "p-4 rounded-xl border-2 transition-all text-left",
-                          alterarForm.tipoAlteracao === 'trocar'
-                            ? "border-blue-500 bg-blue-50 dark:bg-blue-950"
-                            : "border-gray-200 hover:border-gray-300"
-                        )}
-                      >
-                        <RotateCcw className={cn(
-                          "h-6 w-6 mb-2",
-                          alterarForm.tipoAlteracao === 'trocar' ? "text-blue-600" : "text-gray-400"
-                        )} />
-                        <p className="font-semibold text-sm">🔄 Trocar</p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Mudar para outro número/coordenada
-                        </p>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setAlterarForm({ ...alterarForm, tipoAlteracao: 'anular' })}
-                        className={cn(
-                          "p-4 rounded-xl border-2 transition-all text-left",
-                          alterarForm.tipoAlteracao === 'anular'
-                            ? "border-red-500 bg-red-50 dark:bg-red-950"
-                            : "border-gray-200 hover:border-gray-300"
-                        )}
-                      >
-                        <Trash2 className={cn(
-                          "h-6 w-6 mb-2",
-                          alterarForm.tipoAlteracao === 'anular' ? "text-red-600" : "text-gray-400"
-                        )} />
-                        <p className="font-semibold text-sm">🗑️ Anular</p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Cancelar e libertar o número
-                        </p>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Campos de Troca */}
-                  {alterarForm.tipoAlteracao === 'trocar' && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="space-y-4"
-                    >
-                      {alterarForm.campo === 'numero' && (
-                        <div className="space-y-2">
-                          <Label>Novo número</Label>
-                          <Input
-                            type="number"
-                            placeholder="Ex: 42"
-                            value={alterarForm.novoNumero}
-                            onChange={(e) => setAlterarForm({ ...alterarForm, novoNumero: e.target.value })}
-                          />
-                        </div>
-                      )}
-
-                      {alterarForm.campo === 'coordenada' && (
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label>Letra</Label>
-                            <Input
-                              type="text"
-                              maxLength={1}
-                              placeholder="Ex: A"
-                              value={alterarForm.novaLetra}
-                              onChange={(e) => setAlterarForm({ ...alterarForm, novaLetra: e.target.value.toUpperCase() })}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Número</Label>
-                            <Input
-                              type="number"
-                              placeholder="Ex: 5"
-                              value={alterarForm.novoNumero}
-                              onChange={(e) => setAlterarForm({ ...alterarForm, novoNumero: e.target.value })}
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </motion.div>
-                  )}
-
-                  {/* Aviso de Anulação */}
-                  {alterarForm.tipoAlteracao === 'anular' && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                    >
-                      <div className="p-3 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg">
-                        <p className="text-sm text-red-800 dark:text-red-200">
-                          <strong>🔴 Anular participação:</strong> A participação será cancelada e o número/coordenada ficará disponível para outros jogadores. O cliente será notificado.
-                        </p>
-                      </div>
-                    </motion.div>
-                  )}
-
-                  {/* Motivo */}
-                  <div className="space-y-2">
-                    <Label>Motivo da alteração *</Label>
-                    <Input
-                      placeholder="Ex: Erro de registo, troca a pedido do cliente..."
-                      value={alterarForm.motivo}
-                      onChange={(e) => setAlterarForm({ ...alterarForm, motivo: e.target.value })}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      O motivo é obrigatório e ficará visível no histórico
-                    </p>
-                  </div>
-
-                  <div className="p-2 bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-                    <p className="text-xs text-yellow-800 dark:text-yellow-200">
-                      <strong>⚠️ Nota:</strong> Todas as alterações ficam registadas para auditoria.
-                    </p>
-                  </div>
-                </CardContent>
-                <CardFooter className="gap-2">
-                  <Button
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => setAlterarModalOpen(false)}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button
-                    className={cn(
-                      "flex-1",
-                      alterarForm.tipoAlteracao === 'anular' && "bg-red-600 hover:bg-red-700"
-                    )}
-                    disabled={alterarLoading || !alterarForm.motivo.trim() || (alterarForm.tipoAlteracao === 'trocar' && !alterarForm.novoNumero)}
-                    onClick={handleAlterarParticipacao}
-                  >
-                    {alterarLoading ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        {alterarForm.tipoAlteracao === 'anular' ? 'A anular...' : 'A alterar...'}
-                      </>
-                    ) : (
-                      <>
-                        {alterarForm.tipoAlteracao === 'anular' ? (
-                          <>
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Anular Participação
-                          </>
-                        ) : (
-                          <>
-                            <CheckCircle2 className="h-4 w-4 mr-2" />
-                            Confirmar Troca
-                          </>
-                        )}
-                      </>
-                    )}
-                  </Button>
-                </CardFooter>
-              </Card>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Histórico de Alterações Modal */}
-      <AnimatePresence>
-        {historicoModalOpen && historicoParticipacao && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-            onClick={() => setHistoricoModalOpen(false)}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-2xl max-h-[80vh] overflow-hidden"
-            >
-              <Card>
-                <CardHeader className="relative">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-2 top-2"
-                    onClick={() => setHistoricoModalOpen(false)}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                  <CardTitle className="flex items-center gap-2">
-                    <Clock className="h-5 w-5" />
-                    Histórico de Alterações
-                  </CardTitle>
-                  <CardDescription>
-                    Participação em {historicoParticipacao.participacao?.jogo?.tipo?.replace('_', ' ')}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4 max-h-[50vh] overflow-y-auto">
-                  <div className="p-3 bg-muted/50 rounded-lg">
-                    <p className="text-sm">
-                      <strong>Jogo:</strong> {historicoParticipacao.participacao?.jogo?.evento?.nome}
-                    </p>
-                    <p className="text-sm">
-                      <strong>Posição:</strong> {historicoParticipacao.participacao?.jogo?.tipo === 'poio_vaca'
-                        ? `${historicoParticipacao.participacao?.dadosParticipacao?.letra}${historicoParticipacao.participacao?.dadosParticipacao?.numero}`
-                        : `Nº ${historicoParticipacao.participacao?.dadosParticipacao?.numero}`}
-                    </p>
-                  </div>
-
-                  {historicoParticipacao.historico?.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <Clock className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                      <p>Sem alterações registadas</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {historicoParticipacao.historico?.map((alt: any, index: number) => (
-                        <motion.div
-                          key={alt.id}
-                          initial={{ opacity: 0, x: -20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: index * 0.1 }}
-                          className="p-3 border rounded-lg"
-                        >
-                          <div className="flex items-start justify-between mb-2">
-                            <div className="flex items-center gap-2">
-                              <Badge variant="outline">{alt.campo}</Badge>
-                              <span className="text-xs text-muted-foreground">
-                                {new Date(alt.createdAt).toLocaleString('pt-PT')}
-                              </span>
-                            </div>
-                            {alt.notificadoJogador && (
-                              <Badge variant="secondary" className="text-xs">
-                                <Check className="h-3 w-3 mr-1" /> Notificado
-                              </Badge>
-                            )}
-                          </div>
-                          <div className="grid grid-cols-2 gap-2 text-sm mb-2">
-                            <div>
-                              <p className="text-muted-foreground">Anterior:</p>
-                              <p className="font-medium">
-                                {typeof alt.valorAnterior === 'object' 
-                                  ? JSON.stringify(alt.valorAnterior) 
-                                  : alt.valorAnterior}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-muted-foreground">Novo:</p>
-                              <p className="font-medium text-green-600">
-                                {typeof alt.valorNovo === 'object' 
-                                  ? JSON.stringify(alt.valorNovo) 
-                                  : alt.valorNovo}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="p-2 bg-muted/50 rounded text-sm">
-                            <p className="text-muted-foreground">Motivo: {alt.motivo}</p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Alterado por: {alt.admin?.nome} ({alt.admin?.email})
-                            </p>
-                          </div>
-                        </motion.div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-                <CardFooter>
-                  <Button variant="outline" className="w-full" onClick={() => setHistoricoModalOpen(false)}>
-                    Fechar
-                  </Button>
-                </CardFooter>
-              </Card>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Create Modal */}
-      <AnimatePresence>
-        {createModalOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-            onClick={() => setCreateModalOpen(false)}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-md"
-            >
-              <Card>
-                <CardHeader className="relative">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-2 top-2"
-                    onClick={() => setCreateModalOpen(false)}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                  <CardTitle className="flex items-center gap-2">
-                    <Plus className="h-5 w-5" />
-                    Nova {createType === 'aldeia' ? 'Organização' : createType === 'evento' ? 'Campanha' : 'Jogo'}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={handleCreate} className="space-y-4">
-                    {/* Common fields */}
-                    <div className="space-y-2">
-                      <Label>Nome *</Label>
-                      <Input
-                        placeholder={`Nome da${createType === 'aldeia' ? ' organização' : createType === 'evento' ? ' campanha' : 'o jogo'}`}
-                        value={createForm.nome}
-                        onChange={(e) => setCreateForm({ ...createForm, nome: e.target.value })}
-                        required
-                      />
-                    </div>
-
-                    {createType !== 'jogo' && (
-                      <div className="space-y-2">
-                        <Label>Descrição</Label>
-                        <Input
-                          placeholder="Descrição opcional"
-                          value={createForm.descricao}
-                          onChange={(e) => setCreateForm({ ...createForm, descricao: e.target.value })}
-                        />
-                      </div>
-                    )}
-
-                    {/* Aldeia / Organização specific */}
-                    {createType === 'aldeia' && (
-                      <>
-                        {/* Tipo de Organização */}
-                        <div className="space-y-2">
-                          <Label>Tipo de Organização *</Label>
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                            {[
-                              { value: 'aldeia', label: '🏘️ Aldeia', desc: 'Comunidade tradicional' },
-                              { value: 'escola', label: '🏫 Escola', desc: 'Estabelecimento ensino' },
-                              { value: 'associacao_pais', label: '👨‍👩‍👧‍👦 Assoc. Pais', desc: 'Associação de pais' },
-                              { value: 'clube', label: '⚽ Clube', desc: 'Clube desportivo' },
-                            ].map((tipo) => (
-                              <button
-                                key={tipo.value}
-                                type="button"
-                                onClick={() => setCreateForm({ ...createForm, tipoOrganizacao: tipo.value })}
-                                className={cn(
-                                  "p-3 border-2 rounded-xl text-center transition-all",
-                                  createForm.tipoOrganizacao === tipo.value
-                                    ? "border-green-500 bg-green-50 dark:bg-green-950"
-                                    : "border-gray-200 hover:border-gray-300"
-                                )}
-                              >
-                                <span className="text-lg">{tipo.label.split(' ')[0]}</span>
-                                <p className="text-xs mt-1">{tipo.label.split(' ').slice(1).join(' ')}</p>
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Nome/Descrição/Localização */}
-                        <div className="space-y-2">
-                          <Label>Localização</Label>
-                          <Input
-                            placeholder="Ex: Vila Verde, Braga"
-                            value={createForm.localizacao}
-                            onChange={(e) => setCreateForm({ ...createForm, localizacao: e.target.value })}
-                          />
-                        </div>
-
-                        {/* Campos específicos para Escola */}
-                        {createForm.tipoOrganizacao === 'escola' && (
-                          <motion.div
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: 'auto' }}
-                            className="space-y-4 p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800"
-                          >
-                            <p className="text-sm font-medium text-blue-700 dark:text-blue-300">Informações da Escola</p>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                              <div className="space-y-2">
-                                <Label>Nome da Escola *</Label>
-                                <Input
-                                  placeholder="Ex: Escola Básica de Vila Verde"
-                                  value={createForm.nomeEscola}
-                                  onChange={(e) => setCreateForm({ ...createForm, nomeEscola: e.target.value })}
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label>Código da Escola</Label>
-                                <Input
-                                  placeholder="Código do Ministério"
-                                  value={createForm.codigoEscola}
-                                  onChange={(e) => setCreateForm({ ...createForm, codigoEscola: e.target.value })}
-                                />
-                              </div>
-                            </div>
-                            <div className="space-y-2">
-                              <Label>Nível de Ensino</Label>
-                              <select
-                                className="w-full px-3 py-2 border rounded-lg bg-background"
-                                value={createForm.nivelEnsino}
-                                onChange={(e) => setCreateForm({ ...createForm, nivelEnsino: e.target.value })}
-                              >
-                                <option value="">Selecione...</option>
-                                <option value="pre-escolar">Pré-Escolar</option>
-                                <option value="1ciclo">1º Ciclo</option>
-                                <option value="2ciclo">2º Ciclo</option>
-                                <option value="3ciclo">3º Ciclo</option>
-                                <option value="secundario">Secundário</option>
-                                <option value="profissional">Profissional</option>
-                              </select>
-                            </div>
-                          </motion.div>
-                        )}
-
-                        {/* Campos para Associação de Pais */}
-                        {createForm.tipoOrganizacao === 'associacao_pais' && (
-                          <motion.div
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: 'auto' }}
-                            className="space-y-4 p-4 bg-purple-50 dark:bg-purple-950 rounded-lg border border-purple-200 dark:border-purple-800"
-                          >
-                            <p className="text-sm font-medium text-purple-700 dark:text-purple-300">Informações da Associação</p>
-                            <div className="space-y-2">
-                              <Label>Nível de Ensino Associado</Label>
-                              <select
-                                className="w-full px-3 py-2 border rounded-lg bg-background"
-                                value={createForm.nivelEnsino}
-                                onChange={(e) => setCreateForm({ ...createForm, nivelEnsino: e.target.value })}
-                              >
-                                <option value="">Selecione...</option>
-                                <option value="pre-escolar">Pré-Escolar</option>
-                                <option value="1ciclo">1º Ciclo</option>
-                                <option value="2ciclo">2º Ciclo</option>
-                                <option value="3ciclo">3º Ciclo</option>
-                                <option value="secundario">Secundário</option>
-                              </select>
-                            </div>
-                          </motion.div>
-                        )}
-
-                        {/* Responsável */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label>Responsável</Label>
-                            <Input
-                              placeholder="Nome do responsável"
-                              value={createForm.responsavel}
-                              onChange={(e) => setCreateForm({ ...createForm, responsavel: e.target.value })}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Contacto Responsável</Label>
-                            <Input
-                              type="tel"
-                              placeholder="Telemóvel ou email"
-                              value={createForm.contactoResponsavel}
-                              onChange={(e) => setCreateForm({ ...createForm, contactoResponsavel: e.target.value })}
-                            />
-                          </div>
-                        </div>
-
-                        {/* Endereço */}
-                        <div className="space-y-2">
-                          <Label>Morada</Label>
-                          <Input
-                            placeholder="Rua, número, andar..."
-                            value={createForm.morada}
-                            onChange={(e) => setCreateForm({ ...createForm, morada: e.target.value })}
-                          />
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label>Código Postal</Label>
-                            <Input
-                              placeholder="0000-000"
-                              value={createForm.codigoPostal}
-                              onChange={(e) => setCreateForm({ ...createForm, codigoPostal: e.target.value })}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Localidade</Label>
-                            <Input
-                              placeholder="Cidade/Vila"
-                              value={createForm.localidade}
-                              onChange={(e) => setCreateForm({ ...createForm, localidade: e.target.value })}
-                            />
-                          </div>
-                        </div>
-
-                        {/* Conformidade Legal */}
-                        <div className="p-4 bg-yellow-50 dark:bg-yellow-950 rounded-lg border border-yellow-200 dark:border-yellow-800 space-y-4">
-                          <p className="text-sm font-medium text-yellow-700 dark:text-yellow-300 flex items-center gap-2">
-                            <AlertTriangle className="h-4 w-4" />
-                            Conformidade Legal
-                          </p>
-                          <div className="flex items-center gap-3">
-                            <input
-                              type="checkbox"
-                              id="autorizacaoCM"
-                              checked={createForm.autorizacaoCM}
-                              onChange={(e) => setCreateForm({ ...createForm, autorizacaoCM: e.target.checked })}
-                              className="w-4 h-4"
-                            />
-                            <Label htmlFor="autorizacaoCM" className="text-sm">
-                              Autorização da Câmara Municipal
-                            </Label>
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Número de Alvará</Label>
-                            <Input
-                              placeholder="Número do alvará (se aplicável)"
-                              value={createForm.numeroAlvara}
-                              onChange={(e) => setCreateForm({ ...createForm, numeroAlvara: e.target.value })}
-                            />
-                          </div>
-                        </div>
-
-                        {/* Logo */}
-                        <div className="space-y-2">
-                          <Label className="flex items-center gap-2">
-                            <ImageIcon className="h-4 w-4" />
-                            Logo / Imagem
-                          </Label>
-                          <input
-                            ref={aldeiaImageRef}
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={(e) => handleImageUpload(e, 'aldeia')}
-                          />
-                          <div className="flex items-center gap-4">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              onClick={() => aldeiaImageRef.current?.click()}
-                              className="gap-2"
-                            >
-                              <Upload className="h-4 w-4" />
-                              Carregar Imagem
-                            </Button>
-                            {createForm.imagemUrl && (
-                              <div className="flex items-center gap-2">
-                                <img 
-                                  src={createForm.imagemUrl} 
-                                  alt="Preview" 
-                                  className="w-12 h-12 object-cover rounded-lg border"
-                                />
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => setCreateForm({ ...createForm, imagemUrl: '' })}
-                                >
-                                  <X className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                          <p className="text-xs text-muted-foreground">Formatos: JPG, PNG, GIF. Máx: 5MB</p>
-                        </div>
-                      </>
-                    )}
-
-                    {/* Evento specific */}
-                    {createType === 'evento' && (
-                      <>
-                        <div className="space-y-2">
-                          <Label>Aldeia *</Label>
-                          <select
-                            className="w-full px-3 py-2 border rounded-lg bg-background"
-                            value={createForm.aldeiaId}
-                            onChange={(e) => setCreateForm({ ...createForm, aldeiaId: e.target.value })}
-                            required
-                          >
-                            <option value="">Selecione uma aldeia</option>
-                            {aldeias.map(a => (
-                              <option key={a.id} value={a.id}>{a.nome}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label>Data Início *</Label>
-                            <Input
-                              type="date"
-                              value={createForm.dataInicio}
-                              onChange={(e) => setCreateForm({ ...createForm, dataInicio: e.target.value })}
-                              required
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Data Fim</Label>
-                            <Input
-                              type="date"
-                              value={createForm.dataFim}
-                              onChange={(e) => setCreateForm({ ...createForm, dataFim: e.target.value })}
-                            />
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <Label className="flex items-center gap-2">
-                            <ImageIcon className="h-4 w-4" />
-                            Imagem do Evento
-                          </Label>
-                          <input
-                            ref={eventoImageRef}
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={(e) => handleImageUpload(e, 'evento')}
-                          />
-                          <div className="flex items-center gap-4">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              onClick={() => eventoImageRef.current?.click()}
-                              className="gap-2"
-                            >
-                              <Upload className="h-4 w-4" />
-                              Carregar Imagem
-                            </Button>
-                            {createForm.imagemUrl && (
-                              <div className="flex items-center gap-2">
-                                <img 
-                                  src={createForm.imagemUrl} 
-                                  alt="Preview" 
-                                  className="w-12 h-12 object-cover rounded-lg border"
-                                />
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => setCreateForm({ ...createForm, imagemUrl: '' })}
-                                >
-                                  <X className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                          <p className="text-xs text-muted-foreground">Formatos: JPG, PNG, GIF. Máx: 5MB</p>
-                        </div>
-                      </>
-                    )}
-
-                    {/* Jogo specific */}
-                    {createType === 'jogo' && (
-                      <>
-                        <div className="space-y-2">
-                          <Label>Evento *</Label>
-                          <select
-                            className="w-full px-3 py-2 border rounded-lg bg-background"
-                            value={createForm.eventoId}
-                            onChange={(e) => setCreateForm({ ...createForm, eventoId: e.target.value })}
-                            required
-                          >
-                            <option value="">Selecione um evento</option>
-                            {eventos.map(e => (
-                              <option key={e.id} value={e.id}>{e.nome}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Tipo de Jogo *</Label>
-                          <div className="grid grid-cols-3 gap-2">
-                            {Object.entries(GAME_TYPES).map(([key, value]) => (
-                              <Button
-                                key={key}
-                                type="button"
-                                variant={createForm.tipo === key ? 'default' : 'outline'}
-                                onClick={() => setCreateForm({ 
-                                  ...createForm, 
-                                  tipo: key,
-                                  config: key === 'poio_vaca' 
-                                    ? { linhas: 10, colunas: 10 }
-                                    : { totalBilhetes: 100 }
-                                })}
-                                className="flex-col h-auto py-2"
-                              >
-                                <span className="text-xl">{value.emoji}</span>
-                                <span className="text-xs">{value.name}</span>
-                              </Button>
-                            ))}
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Preço por Participação (€) *</Label>
-                          <Input
-                            type="number"
-                            step="0.50"
-                            min="0.50"
-                            placeholder="1.00"
-                            value={createForm.precoParticipacao}
-                            onChange={(e) => setCreateForm({ ...createForm, precoParticipacao: parseFloat(e.target.value) })}
-                            required
-                          />
-                        </div>
-                        {createForm.tipo === 'poio_vaca' && (
-                          <div className="space-y-3">
-                            <Label className="flex items-center gap-2">
-                              <Grid3X3 className="h-4 w-4" />
-                              Configuração do Grid
-                            </Label>
-                            <div className="grid grid-cols-2 gap-4">
-                              <div className="space-y-2">
-                                <Label className="text-xs text-muted-foreground">Linhas (A-Z)</Label>
-                                <Input
-                                  type="number"
-                                  min="2"
-                                  max="26"
-                                  value={createForm.config.linhas || 10}
-                                  onChange={(e) => setCreateForm({ 
-                                    ...createForm, 
-                                    config: { 
-                                      ...createForm.config,
-                                      linhas: parseInt(e.target.value) || 10 
-                                    } 
-                                  })}
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label className="text-xs text-muted-foreground">Colunas (1-99)</Label>
-                                <Input
-                                  type="number"
-                                  min="2"
-                                  max="99"
-                                  value={createForm.config.colunas || 10}
-                                  onChange={(e) => setCreateForm({ 
-                                    ...createForm, 
-                                    config: { 
-                                      ...createForm.config,
-                                      colunas: parseInt(e.target.value) || 10 
-                                    } 
-                                  })}
-                                />
-                              </div>
-                            </div>
-                            <div className="p-3 bg-muted/50 rounded-lg text-center">
-                              <p className="text-sm text-muted-foreground">Total de coordenadas:</p>
-                              <p className="text-2xl font-bold text-green-600">
-                                {(createForm.config.linhas || 10) * (createForm.config.colunas || 10)}
-                              </p>
-                            </div>
-                          </div>
-                        )}
-                        {createForm.tipo === 'rifa' && (
-                          <div className="space-y-2">
-                            <Label className="flex items-center gap-2">
-                              <Hash className="h-4 w-4" />
-                              Total de Bilhetes
-                            </Label>
-                            <Input
-                              type="number"
-                              min="10"
-                              value={createForm.config.totalBilhetes}
-                              onChange={(e) => setCreateForm({ 
-                                ...createForm, 
-                                config: { totalBilhetes: parseInt(e.target.value) } 
-                              })}
-                            />
-                          </div>
-                        )}
-                        {createForm.tipo === 'tombola' && (
-                          <div className="space-y-2">
-                            <Label className="flex items-center gap-2">
-                              <Ticket className="h-4 w-4" />
-                              Total de Bilhetes
-                            </Label>
-                            <Input
-                              type="number"
-                              min="10"
-                              value={createForm.config.totalBilhetes || 50}
-                              onChange={(e) => setCreateForm({ 
-                                ...createForm, 
-                                config: { totalBilhetes: parseInt(e.target.value) } 
-                              })}
-                            />
-                          </div>
-                        )}
-                        
-                        {/* Raspadinha Configuration */}
-                        {createForm.tipo === 'raspadinha' && (
-                          <div className="space-y-4">
-                            <div className="p-4 bg-amber-50 dark:bg-amber-950 rounded-lg border border-amber-200 dark:border-amber-800">
-                              <div className="flex items-center gap-2 mb-3">
-                                <Sparkles className="h-5 w-5 text-amber-600" />
-                                <span className="font-semibold text-amber-700 dark:text-amber-300">Configuração da Raspadinha</span>
-                              </div>
-                              
-                              {/* Stock e Preço */}
-                              <div className="grid grid-cols-2 gap-4 mb-4">
-                                <div className="space-y-2">
-                                  <Label className="text-xs">Nº Total de Cartões</Label>
-                                  <Input
-                                    type="number"
-                                    min="10"
-                                    value={stockInicial}
-                                    onChange={(e) => setStockInicial(parseInt(e.target.value) || 100)}
-                                  />
-                                </div>
-                                <div className="space-y-2">
-                                  <Label className="text-xs">Limite por Pessoa</Label>
-                                  <Input
-                                    type="number"
-                                    min="1"
-                                    value={limitePorUsuario}
-                                    onChange={(e) => setLimitePorUsuario(parseInt(e.target.value) || 10)}
-                                  />
-                                </div>
-                              </div>
-                              
-                              {/* Lista de Prémios */}
-                              <div className="space-y-3">
-                                <div className="flex items-center justify-between">
-                                  <Label className="text-xs font-semibold">Configuração de Prémios</Label>
-                                  <span className={cn(
-                                    "text-xs font-bold",
-                                    premiosRaspadinha.reduce((sum, p) => sum + p.percentagem, 0) === 1 
-                                      ? "text-green-600" 
-                                      : "text-red-600"
-                                  )}>
-                                    Total: {(premiosRaspadinha.reduce((sum, p) => sum + p.percentagem, 0) * 100).toFixed(0)}%
-                                    {premiosRaspadinha.reduce((sum, p) => sum + p.percentagem, 0) !== 1 && " (deve ser 100%)"}
-                                  </span>
-                                </div>
-                                
-                                {/* Prémios List */}
-                                <div className="space-y-2 max-h-[200px] overflow-y-auto">
-                                  {premiosRaspadinha.map((premio, idx) => (
-                                    <div key={idx} className="flex items-center gap-2 p-2 bg-white dark:bg-gray-800 rounded border">
-                                      <Input
-                                        placeholder="Nome"
-                                        value={premio.nome}
-                                        onChange={(e) => {
-                                          const newPremios = [...premiosRaspadinha];
-                                          newPremios[idx].nome = e.target.value;
-                                          setPremiosRaspadinha(newPremios);
-                                        }}
-                                        className="flex-1 h-8 text-xs"
-                                      />
-                                      <select
-                                        value={premio.tipo}
-                                        onChange={(e) => {
-                                          const newPremios = [...premiosRaspadinha];
-                                          newPremios[idx].tipo = e.target.value as 'dinheiro' | 'fisico';
-                                          setPremiosRaspadinha(newPremios);
-                                        }}
-                                        className="h-8 text-xs border rounded px-1"
-                                      >
-                                        <option value="dinheiro">Dinheiro</option>
-                                        <option value="fisico">Físico</option>
-                                      </select>
-                                      <Input
-                                        type="number"
-                                        placeholder="%"
-                                        step="0.01"
-                                        min="0"
-                                        max="1"
-                                        value={premio.percentagem || ''}
-                                        onChange={(e) => {
-                                          const newPremios = [...premiosRaspadinha];
-                                          newPremios[idx].percentagem = parseFloat(e.target.value) || 0;
-                                          setPremiosRaspadinha(newPremios);
-                                        }}
-                                        className="w-16 h-8 text-xs"
-                                      />
-                                      <span className="text-xs text-muted-foreground">%</span>
-                                      <Input
-                                        type="number"
-                                        placeholder="Valor €"
-                                        step="0.50"
-                                        min="0"
-                                        value={premio.valor || ''}
-                                        onChange={(e) => {
-                                          const newPremios = [...premiosRaspadinha];
-                                          newPremios[idx].valor = parseFloat(e.target.value) || 0;
-                                          setPremiosRaspadinha(newPremios);
-                                        }}
-                                        className="w-20 h-8 text-xs"
-                                      />
-                                      <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-8 w-8 p-0"
-                                        onClick={() => {
-                                          setPremiosRaspadinha(prev => prev.filter((_, i) => i !== idx));
-                                        }}
-                                      >
-                                        <Trash2 className="h-3 w-3 text-red-500" />
-                                      </Button>
-                                    </div>
-                                  ))}
-                                </div>
-                                
-                                {/* Add Prémio Button */}
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  className="w-full"
-                                  onClick={() => {
-                                    setPremiosRaspadinha(prev => [...prev, {
-                                      nome: '',
-                                      tipo: 'dinheiro' as const,
-                                      percentagem: 0,
-                                      valor: 0
-                                    }]);
-                                  }}
-                                >
-                                  <Plus className="h-3 w-3 mr-1" />
-                                  Adicionar Prémio
-                                </Button>
-                              </div>
-                            </div>
-                            
-                            {/* Cálculos Automáticos */}
-                            {stockInicial > 0 && premiosRaspadinha.length > 0 && (
-                              <div className="p-4 bg-green-50 dark:bg-green-950 rounded-lg border border-green-200 dark:border-green-800">
-                                <div className="flex items-center gap-2 mb-3">
-                                  <BarChart3 className="h-5 w-5 text-green-600" />
-                                  <span className="font-semibold text-green-700 dark:text-green-300">Análise Financeira</span>
-                                </div>
-                                
-                                {/* Table of prizes */}
-                                <div className="mb-4 overflow-x-auto">
-                                  <table className="w-full text-xs">
-                                    <thead>
-                                      <tr className="border-b">
-                                        <th className="text-left py-1">Prémio</th>
-                                        <th className="text-center py-1">%</th>
-                                        <th className="text-center py-1">Qtd</th>
-                                        <th className="text-right py-1">Valor Un.</th>
-                                        <th className="text-right py-1">Custo Total</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {premiosRaspadinha.map((premio, idx) => {
-                                        const quantidade = Math.round(premio.percentagem * stockInicial);
-                                        const custo = quantidade * premio.valor;
-                                        return (
-                                          <tr key={idx} className="border-b">
-                                            <td className="py-1">{premio.nome || '-'}</td>
-                                            <td className="text-center py-1">{(premio.percentagem * 100).toFixed(1)}%</td>
-                                            <td className="text-center py-1">{quantidade}</td>
-                                            <td className="text-right py-1">{premio.valor.toFixed(2)}€</td>
-                                            <td className="text-right py-1 font-medium">{custo.toFixed(2)}€</td>
-                                          </tr>
-                                        );
-                                      })}
-                                      <tr className="border-t-2 border-green-300">
-                                        <td colSpan={4} className="py-2 font-semibold">Total Prémios</td>
-                                        <td className="text-right py-2 font-bold">
-                                          {premiosRaspadinha.reduce((sum, p) => sum + Math.round(p.percentagem * stockInicial) * p.valor, 0).toFixed(2)}€
-                                        </td>
-                                      </tr>
-                                    </tbody>
-                                  </table>
-                                </div>
-                                
-                                {/* Summary Cards */}
-                                <div className="grid grid-cols-2 gap-3">
-                                  <div className="p-3 bg-white dark:bg-gray-800 rounded-lg text-center">
-                                    <p className="text-xs text-muted-foreground">Receita Total</p>
-                                    <p className="text-xl font-bold text-green-600">
-                                      {(stockInicial * createForm.precoParticipacao).toFixed(2)}€
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">{stockInicial} cartões × {createForm.precoParticipacao}€</p>
-                                  </div>
-                                  <div className="p-3 bg-white dark:bg-gray-800 rounded-lg text-center">
-                                    <p className="text-xs text-muted-foreground">Total Prémios</p>
-                                    <p className="text-xl font-bold text-amber-600">
-                                      {premiosRaspadinha.reduce((sum, p) => sum + Math.round(p.percentagem * stockInicial) * p.valor, 0).toFixed(2)}€
-                                    </p>
-                                  </div>
-                                  <div className="p-3 bg-white dark:bg-gray-800 rounded-lg text-center">
-                                    <p className="text-xs text-muted-foreground">Lucro Estimado</p>
-                                    <p className={cn(
-                                      "text-xl font-bold",
-                                      (stockInicial * createForm.precoParticipacao) - premiosRaspadinha.reduce((sum, p) => sum + Math.round(p.percentagem * stockInicial) * p.valor, 0) >= 0
-                                        ? "text-green-600"
-                                        : "text-red-600"
-                                    )}>
-                                      {((stockInicial * createForm.precoParticipacao) - premiosRaspadinha.reduce((sum, p) => sum + Math.round(p.percentagem * stockInicial) * p.valor, 0)).toFixed(2)}€
-                                    </p>
-                                  </div>
-                                  <div className="p-3 bg-white dark:bg-gray-800 rounded-lg text-center">
-                                    <p className="text-xs text-muted-foreground">Margem</p>
-                                    <p className={cn(
-                                      "text-xl font-bold",
-                                      ((stockInicial * createForm.precoParticipacao) - premiosRaspadinha.reduce((sum, p) => sum + Math.round(p.percentagem * stockInicial) * p.valor, 0)) / (stockInicial * createForm.precoParticipacao) >= 0.2
-                                        ? "text-green-600"
-                                        : ((stockInicial * createForm.precoParticipacao) - premiosRaspadinha.reduce((sum, p) => sum + Math.round(p.percentagem * stockInicial) * p.valor, 0)) / (stockInicial * createForm.precoParticipacao) >= 0
-                                          ? "text-amber-600"
-                                          : "text-red-600"
-                                    )}>
-                                      {stockInicial * createForm.precoParticipacao > 0 
-                                        ? (((stockInicial * createForm.precoParticipacao) - premiosRaspadinha.reduce((sum, p) => sum + Math.round(p.percentagem * stockInicial) * p.valor, 0)) / (stockInicial * createForm.precoParticipacao) * 100).toFixed(1)
-                                        : 0}%
-                                    </p>
-                                  </div>
-                                </div>
-                                
-                                {/* Warning or Success */}
-                                {(() => {
-                                  const totalPercent = premiosRaspadinha.reduce((sum, p) => sum + p.percentagem, 0);
-                                  const lucro = (stockInicial * createForm.precoParticipacao) - premiosRaspadinha.reduce((sum, p) => sum + Math.round(p.percentagem * stockInicial) * p.valor, 0);
-                                  
-                                  if (totalPercent !== 1) {
-                                    return (
-                                      <div className="mt-3 p-2 bg-red-100 dark:bg-red-900 rounded text-xs text-red-700 dark:text-red-300 flex items-center gap-2">
-                                        <AlertTriangle className="h-4 w-4" />
-                                        As percentagens devem somar 100%
-                                      </div>
-                                    );
-                                  }
-                                  if (lucro < 0) {
-                                    return (
-                                      <div className="mt-3 p-2 bg-red-100 dark:bg-red-900 rounded text-xs text-red-700 dark:text-red-300 flex items-center gap-2">
-                                        <AlertTriangle className="h-4 w-4" />
-                                        Configuração com prejuízo! Ajuste os prémios ou o preço.
-                                      </div>
-                                    );
-                                  }
-                                  if (lucro / (stockInicial * createForm.precoParticipacao) < 0.2) {
-                                    return (
-                                      <div className="mt-3 p-2 bg-amber-100 dark:bg-amber-900 rounded text-xs text-amber-700 dark:text-amber-300 flex items-center gap-2">
-                                        <AlertTriangle className="h-4 w-4" />
-                                        Margem baixa. Considere ajustar para pelo menos 20%.
-                                      </div>
-                                    );
-                                  }
-                                  return (
-                                    <div className="mt-3 p-2 bg-green-100 dark:bg-green-900 rounded text-xs text-green-700 dark:text-green-300 flex items-center gap-2">
-                                      <CheckCircle2 className="h-4 w-4" />
-                                      Configuração viável e lucrativa!
-                                    </div>
-                                  );
-                                })()}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </>
-                    )}
-
-                    <Button type="submit" className="w-full" disabled={createLoading || (createForm.tipo === 'raspadinha' && premiosRaspadinha.reduce((sum, p) => sum + p.percentagem, 0) !== 1)}>
-                      {createLoading ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          A criar...
-                        </>
-                      ) : (
-                        `Criar ${createType === 'aldeia' ? 'Aldeia' : createType === 'evento' ? 'Evento' : 'Jogo'}`
-                      )}
-                    </Button>
-                  </form>
-                </CardContent>
-              </Card>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Jogo Detalhe Modal */}
-      <AnimatePresence>
-        {jogoDetalhe && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-            onClick={() => setJogoDetalhe(null)}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-3xl"
-            >
-              <Card>
-                <CardHeader className="relative">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-2 top-2"
-                    onClick={() => setJogoDetalhe(null)}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                  <CardTitle className="flex items-center gap-2">
-                    <span className="text-2xl">
-                      {GAME_TYPES[jogoDetalhe.tipo as keyof typeof GAME_TYPES]?.emoji}
-                    </span>
-                    {jogoDetalhe.tipo.replace('_', ' ')}
-                  </CardTitle>
-                  <CardDescription>
-                    {jogoDetalhe.evento?.aldeia?.nome} • {jogoDetalhe.evento?.nome}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="p-4 bg-muted/50 rounded-lg text-center">
-                      <p className="text-xs text-muted-foreground">Preço</p>
-                      <p className="text-2xl font-bold text-green-600">{jogoDetalhe.precoParticipacao}€</p>
-                    </div>
-                    <div className="p-4 bg-muted/50 rounded-lg text-center">
-                      <p className="text-xs text-muted-foreground">Participações</p>
-                      <p className="text-2xl font-bold">{jogoDetalhe._count?.participacoes || 0}</p>
-                    </div>
-                    <div className="p-4 bg-muted/50 rounded-lg text-center">
-                      <p className="text-xs text-muted-foreground">Angariado</p>
-                      <p className="text-2xl font-bold text-green-600">
-                        {((jogoDetalhe._count?.participacoes || 0) * jogoDetalhe.precoParticipacao).toFixed(2)}€
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Prémio do Jogo */}
-                  {jogoDetalhe.premio && (
-                    <div className="p-4 bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950 dark:to-yellow-950 rounded-lg border border-amber-200 dark:border-amber-800">
-                      <div className="flex items-center gap-2 mb-3">
-                        <Gift className="h-5 w-5 text-amber-600" />
-                        <span className="font-semibold text-amber-700 dark:text-amber-300">Prémio Principal</span>
-                      </div>
-                      <div className="flex items-start gap-4">
-                        {jogoDetalhe.premio.imagemBase64 ? (
-                          <img 
-                            src={jogoDetalhe.premio.imagemBase64} 
-                            alt={jogoDetalhe.premio.nome}
-                            className="w-20 h-20 object-cover rounded-lg border border-amber-200"
-                          />
-                        ) : (
-                          <div className="w-20 h-20 bg-amber-100 dark:bg-amber-900 rounded-lg flex items-center justify-center">
-                            <Gift className="h-10 w-10 text-amber-500" />
-                          </div>
-                        )}
-                        <div className="flex-1">
-                          <p className="font-semibold text-lg">{jogoDetalhe.premio.nome}</p>
-                          {jogoDetalhe.premio.descricao && (
-                            <p className="text-sm text-muted-foreground mt-1">{jogoDetalhe.premio.descricao}</p>
-                          )}
-                          <div className="flex items-center gap-4 mt-2">
-                            {jogoDetalhe.premio.valorEstimado && (
-                              <Badge variant="secondary" className="gap-1 bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300">
-                                <Euro className="h-3 w-3" />
-                                {jogoDetalhe.premio.valorEstimado.toFixed(2)}€
-                              </Badge>
-                            )}
-                            {jogoDetalhe.premio.patrocinador && (
-                              <span className="text-xs text-muted-foreground">
-                                Patrocinado por: {jogoDetalhe.premio.patrocinador}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Aviso Legal */}
-                  <div className="p-3 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
-                    <div className="flex items-start gap-2">
-                      <Shield className="h-4 w-4 text-blue-600 mt-0.5" />
-                      <div className="text-xs text-blue-700 dark:text-blue-300">
-                        <p className="font-semibold mb-1">Sorteio Transparente</p>
-                        <p>O sorteio utiliza criptografia para garantir imparcialidade. Cada participação tem igual probabilidade de ganhar. O resultado é público e verificável.</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="border rounded-lg p-4 max-h-[300px] overflow-auto">
-                    <p className="text-sm text-muted-foreground mb-4 text-center">
-                      {jogoDetalhe.tipo === 'poio_vaca' 
-                        ? 'Grid de coordenadas:' 
-                        : 'Números disponíveis:'}
-                    </p>
-                    
-                    {jogoDetalhe.tipo === 'poio_vaca' && renderPoioVacaGrid(jogoDetalhe, false)}
-                    {(jogoDetalhe.tipo === 'rifa' || jogoDetalhe.tipo === 'tombola') && (
-                      <RifaNumberSelector 
-                        jogo={jogoDetalhe} 
-                        selected={null}
-                        onSelect={() => {}}
-                        readOnly
-                        ocupados={ocupados.map(o => o.numero)}
-                        loading={loadingOcupados}
-                        meusNumeros={participacoesJogo.filter(p => p.userId === user?.id).map(p => p.dadosParticipacao.numero)}
-                        participacoesJogo={participacoesJogo}
-                        onOccupiedClick={(num) => handlePosicaoClick({ numero: num }, ['super_admin', 'aldeia_admin', 'vendedor'].includes(user?.role || ''))}
-                        isAdminOrVendedor={user ? ['super_admin', 'aldeia_admin', 'vendedor'].includes(user.role) : false}
-                      />
-                    )}
-                  </div>
-
-                  {/* Lista de Participações para Admins */}
-                  {user && ['super_admin', 'aldeia_admin', 'vendedor'].includes(user.role) && participacoesJogo.length > 0 && (
-                    <div className="border rounded-lg overflow-hidden">
-                      <div className="p-3 bg-muted/50 border-b flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Users className="h-4 w-4" />
-                          <span className="font-semibold text-sm">Lista de Participações ({participacoesJogo.length})</span>
-                        </div>
-                        {user.role === 'super_admin' && (
-                          <Badge variant="secondary" className="text-xs">Admin Total</Badge>
-                        )}
-                      </div>
-                      <div className="max-h-[250px] overflow-y-auto">
-                        <table className="w-full text-sm">
-                          <thead className="bg-muted/30 sticky top-0">
-                            <tr>
-                              <th className="text-left p-2 font-medium">Nº/Coord</th>
-                              <th className="text-left p-2 font-medium">Cliente</th>
-                              <th className="text-left p-2 font-medium hidden sm:table-cell">Contacto</th>
-                              <th className="text-center p-2 font-medium">Ação</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y">
-                            {participacoesJogo
-                              .sort((a, b) => {
-                                const numA = a.dadosParticipacao?.numero || 0;
-                                const numB = b.dadosParticipacao?.numero || 0;
-                                return numA - numB;
-                              })
-                              .map((p) => {
-                                const posicao = jogoDetalhe.tipo === 'poio_vaca'
-                                  ? `${p.dadosParticipacao?.letra}${p.dadosParticipacao?.numero}`
-                                  : `Nº ${p.dadosParticipacao?.numero}`;
-                                
-                                const cliente = p.nomeCliente || p.user?.nome || 'N/A';
-                                const contacto = p.telefoneCliente || p.emailCliente || '-';
-                                
-                                // Check permission to alter
-                                const canAlterThis = () => {
-                                  if (user.role === 'super_admin') return true;
-                                  if (user.role === 'aldeia_admin') return jogoDetalhe.evento?.aldeiaId === user.aldeiaId;
-                                  if (user.role === 'vendedor') return p.adminRegistouId === user.id || p.userId === user.id;
-                                  return false;
-                                };
-                                const canAlter = canAlterThis();
-                                
-                                return (
-                                  <tr key={p.id} className="hover:bg-muted/20">
-                                    <td className="p-2">
-                                      <Badge variant="outline" className="font-mono">
-                                        {posicao}
-                                      </Badge>
-                                    </td>
-                                    <td className="p-2 font-medium">{cliente}</td>
-                                    <td className="p-2 text-muted-foreground hidden sm:table-cell text-xs">
-                                      {contacto}
-                                    </td>
-                                    <td className="p-2 text-center">
-                                      {canAlter ? (
-                                        <Button
-                                          size="sm"
-                                          variant="ghost"
-                                          className="h-7 px-2"
-                                          onClick={() => {
-                                            setParticipacaoParaAlterar(p);
-                                            setAlterarForm({
-                                              campo: jogoDetalhe.tipo === 'poio_vaca' ? 'coordenada' : 'numero',
-                                              novoNumero: '',
-                                              novaLetra: '',
-                                              motivo: '',
-                                              tipoAlteracao: 'trocar'
-                                            });
-                                            setAlterarModalOpen(true);
-                                          }}
-                                        >
-                                          <Settings className="h-3 w-3 mr-1" />
-                                          Gerir
-                                        </Button>
-                                      ) : (
-                                        <span className="text-xs text-muted-foreground flex items-center justify-center gap-1">
-                                          <Shield className="h-3 w-3" />
-                                          Sem acesso
-                                        </span>
-                                      )}
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
-
-                  {jogoDetalhe.sorteio && (
-                    <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Trophy className="h-5 w-5 text-yellow-600" />
-                        <p className="font-semibold text-yellow-800">Resultado do Sorteio</p>
-                      </div>
-                      <p className="text-lg font-bold text-yellow-700">
-                        {jogoDetalhe.tipo === 'poio_vaca' 
-                          ? `Coordenada: ${jogoDetalhe.sorteio.resultado.letra}${jogoDetalhe.sorteio.resultado.numero}`
-                          : `Número: ${jogoDetalhe.sorteio.resultado.numero}`}
-                      </p>
-                      <p className="text-xs text-yellow-600 mt-1">
-                        Sorteado em {new Date(jogoDetalhe.sorteio.createdAt).toLocaleString('pt-PT')}
-                      </p>
-                    </div>
-                  )}
-                </CardContent>
-                <CardFooter>
-                  {jogoDetalhe.estado === 'ativo' && (
-                    <Button 
-                      className="w-full gap-2"
-                      onClick={() => {
-                        setJogoDetalhe(null);
-                        openParticiparModal(jogoDetalhe);
-                      }}
-                    >
-                      <Play className="h-4 w-4" />
-                      Participar
-                    </Button>
-                  )}
-                </CardFooter>
-              </Card>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Info Posição Modal - Ver quem jogou */}
-      <AnimatePresence>
-        {infoPosicaoModal.open && infoPosicaoModal.participacao && (() => {
-          const p = infoPosicaoModal.participacao;
-          const jogo = p.jogo;
-          
-          // Check if current user can alter this participation
-          const canAlterThis = () => {
-            if (!user) return false;
-            const isSuperAdmin = user.role === 'super_admin';
-            const isAldeiaAdmin = user.role === 'aldeia_admin';
-            const isVendedor = user.role === 'vendedor';
-            
-            if (isSuperAdmin) return true;
-            if (isAldeiaAdmin && jogo?.evento?.aldeiaId === user.aldeiaId) return true;
-            if (isVendedor && (p.adminRegistouId === user.id || p.userId === user.id)) return true;
-            return false;
-          };
-          
-          const canAlter = canAlterThis();
-          
-          return (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-            onClick={() => setInfoPosicaoModal({ open: false, participacao: null, posicao: '' })}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-sm"
-            >
-              <Card>
-                <CardHeader className="relative">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-2 top-2"
-                    onClick={() => setInfoPosicaoModal({ open: false, participacao: null, posicao: '' })}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                  <CardTitle className="flex items-center gap-2">
-                    <span className="text-2xl">📍</span>
-                    {infoPosicaoModal.posicao}
-                  </CardTitle>
-                  <CardDescription>
-                    Informação do jogador
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Data da participação */}
-                  <div className="p-3 bg-muted/50 rounded-lg">
-                    <p className="text-xs text-muted-foreground">Data</p>
-                    <p className="font-medium">
-                      {new Date(infoPosicaoModal.participacao.createdAt).toLocaleString('pt-PT')}
-                    </p>
-                  </div>
-                  
-                  {/* Info do cliente */}
-                  {infoPosicaoModal.participacao.nomeCliente ? (
-                    <div className="space-y-2">
-                      <div className="p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
-                        <p className="text-xs text-blue-600 dark:text-blue-400 mb-1">Cliente</p>
-                        <p className="font-semibold text-blue-800 dark:text-blue-200">
-                          {infoPosicaoModal.participacao.nomeCliente}
-                        </p>
-                        {infoPosicaoModal.participacao.telefoneCliente && (
-                          <p className="text-sm text-blue-700 dark:text-blue-300 flex items-center gap-1 mt-1">
-                            📱 {infoPosicaoModal.participacao.telefoneCliente}
-                          </p>
-                        )}
-                        {infoPosicaoModal.participacao.emailCliente && (
-                          <p className="text-sm text-blue-700 dark:text-blue-300 flex items-center gap-1">
-                            ✉️ {infoPosicaoModal.participacao.emailCliente}
-                          </p>
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground text-center">
-                        Registado por administrador/vendedor
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg">
-                      <p className="text-xs text-green-600 dark:text-green-400 mb-1">Jogador registado</p>
-                      <p className="font-medium text-green-800 dark:text-green-200">
-                        Participação online
-                      </p>
-                      <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-                        ID: {infoPosicaoModal.participacao.userId.slice(0, 8)}...
-                      </p>
-                    </div>
-                  )}
-                  
-                  {/* Valor pago */}
-                  <div className="p-3 bg-muted/50 rounded-lg">
-                    <p className="text-xs text-muted-foreground">Valor pago</p>
-                    <p className="text-lg font-bold text-green-600">
-                      {infoPosicaoModal.participacao.valorPago}€
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Via {infoPosicaoModal.participacao.metodoPagamento}
-                    </p>
-                  </div>
-                  
-                  {/* Permissão info */}
-                  {!canAlter && user && ['super_admin', 'aldeia_admin', 'vendedor'].includes(user.role) && (
-                    <div className="p-2 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg">
-                      <p className="text-xs text-gray-600 dark:text-gray-400 flex items-center gap-1">
-                        <Shield className="h-3 w-3" />
-                        Sem permissão para alterar esta participação
-                      </p>
-                    </div>
-                  )}
-                </CardContent>
-                {canAlter && (
-                  <CardFooter className="gap-2">
-                    <Button
-                      variant="outline"
-                      className="flex-1"
-                      onClick={() => setInfoPosicaoModal({ open: false, participacao: null, posicao: '' })}
-                    >
-                      Fechar
-                    </Button>
-                    <Button
-                      className="flex-1"
-                      onClick={() => {
-                        setParticipacaoParaAlterar(infoPosicaoModal.participacao);
-                        setAlterarForm({
-                          campo: jogo?.tipo === 'poio_vaca' ? 'coordenada' : 'numero',
-                          novoNumero: '',
-                          novaLetra: '',
-                          motivo: '',
-                          tipoAlteracao: 'trocar'
-                        });
-                        setInfoPosicaoModal({ open: false, participacao: null, posicao: '' });
-                        setAlterarModalOpen(true);
-                      }}
-                    >
-                      <Settings className="h-4 w-4 mr-2" />
-                      Gerir
-                    </Button>
-                  </CardFooter>
-                )}
-              </Card>
-            </motion.div>
-          </motion.div>
-          );
-        })()}
-      </AnimatePresence>
-
-      {/* Novo Vendedor Modal */}
-      <AnimatePresence>
-        {novoVendedorModalOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-            onClick={() => setNovoVendedorModalOpen(false)}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-md"
-            >
-              <Card>
-                <CardHeader className="relative">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-2 top-2"
-                    onClick={() => setNovoVendedorModalOpen(false)}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                  <CardTitle className="flex items-center gap-2">
-                    <Users className="h-5 w-5" />
-                    Novo Vendedor
-                  </CardTitle>
-                  <CardDescription>
-                    Adicionar um novo vendedor à aldeia
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                    <p className="text-sm text-blue-800">
-                      <strong>📋 Info:</strong> O vendedor poderá registar participações para clientes e receber pagamentos em dinheiro.
-                    </p>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="vendedor-nome">Nome *</Label>
-                    <Input
-                      id="vendedor-nome"
-                      placeholder="Nome completo"
-                      value={novoVendedorForm.nome}
-                      onChange={(e) => setNovoVendedorForm({ ...novoVendedorForm, nome: e.target.value })}
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="vendedor-email">Email *</Label>
-                    <Input
-                      id="vendedor-email"
-                      type="email"
-                      placeholder="email@exemplo.com"
-                      value={novoVendedorForm.email}
-                      onChange={(e) => setNovoVendedorForm({ ...novoVendedorForm, email: e.target.value })}
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="vendedor-password">Password *</Label>
-                    <Input
-                      id="vendedor-password"
-                      type="password"
-                      placeholder="Password de acesso"
-                      value={novoVendedorForm.password}
-                      onChange={(e) => setNovoVendedorForm({ ...novoVendedorForm, password: e.target.value })}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Mínimo 6 caracteres
-                    </p>
-                  </div>
-                </CardContent>
-                <CardFooter className="gap-2">
-                  <Button
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => setNovoVendedorModalOpen(false)}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button
-                    className="flex-1"
-                    disabled={novoVendedorLoading || !novoVendedorForm.nome || !novoVendedorForm.email || !novoVendedorForm.password}
-                    onClick={handleCriarVendedor}
-                  >
-                    {novoVendedorLoading ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        A criar...
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle2 className="h-4 w-4 mr-2" />
-                        Criar Vendedor
-                      </>
-                    )}
-                  </Button>
-                </CardFooter>
-              </Card>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Profile Edit Modal */}
+      <WizardModal
+        isOpen={wizardModalOpen}
+        onClose={() => setWizardModalOpen(false)}
+        wizardStep={wizardStep}
+        setWizardStep={setWizardStep}
+        wizardData={wizardData}
+        setWizardData={setWizardData}
+        wizardLoading={wizardLoading}
+        handleSaveWizard={handleSaveWizard}
+        wizardLogoRef={wizardLogoRef}
+        handleImageUpload={handleImageUpload}
+      />
+    {/* Profile Edit Modal */}
       <AnimatePresence>
         {profileModalOpen && (
           <motion.div
@@ -7059,15 +6022,9 @@ export default function DashboardPage() {
                   ) : (
                     <>
                       {/* Descrição */}
-                       
-                    {eventoDetalhe.objectivoAngariacao && (
-                      <div className="mt-6">
-                        <FundingGoal
-                          current={eventoDetalheStats.totalAngariado}
-                          target={eventoDetalhe.objectivoAngariacao}
-                        />
-                      </div>
-                    )}
+                      {eventoDetalhe.descricao && (
+                        <p className="text-sm text-muted-foreground">{eventoDetalhe.descricao}</p>
+                      )}
 
                       {/* Datas */}
                       <div className="grid grid-cols-2 gap-3">
@@ -7303,3 +6260,333 @@ export default function DashboardPage() {
 }
 
 // Rifa Number Selector Component (to avoid useState in render)
+function RifaNumberSelector({
+  jogo,
+  selected,
+  onSelect,
+  readOnly = false,
+  ocupados = [],
+  loading = false,
+  multiSelect = false,
+  selectedNumbers = [],
+  onToggleNumber,
+  maxNumbers = 10,
+  meusNumeros = [],
+  participacoesJogo = [],
+  onOccupiedClick,
+  isAdminOrVendedor = false
+}: {
+  jogo: Jogo;
+  selected: number | null;
+  onSelect: (num: number) => void;
+  readOnly?: boolean;
+  ocupados?: number[];
+  loading?: boolean;
+  multiSelect?: boolean;
+  selectedNumbers?: number[];
+  onToggleNumber?: (num: number) => void;
+  maxNumbers?: number;
+  meusNumeros?: number[];
+  participacoesJogo?: Participacao[];
+  onOccupiedClick?: (num: number) => void;
+  isAdminOrVendedor?: boolean;
+}) {
+  const config = typeof jogo.config === 'string' ? JSON.parse(jogo.config) : jogo.config;
+  const total = config.totalBilhetes || 100;
+  const [pagina, setPagina] = useState(0);
+  const numerosPorPagina = 50;
+
+  const inicio = pagina * numerosPorPagina;
+  const fim = Math.min(inicio + numerosPorPagina, total);
+
+  // Ensure ocupados is always an array
+  const ocupadosList = Array.isArray(ocupados) ? ocupados : [];
+  const meusNumerosList = Array.isArray(meusNumeros) ? meusNumeros : [];
+
+  // Debug logs
+  console.log('🎲 RifaNumberSelector - ocupadosList:', ocupadosList, 'tipos:', ocupadosList.map(o => typeof o));
+  console.log('🎲 RifaNumberSelector - meusNumerosList:', meusNumerosList);
+
+  const isOcupado = (num: number) => {
+    // Comparação robusta - converte para number
+    const result = ocupadosList.some(o => Number(o) === Number(num));
+    if (result) {
+      console.log(`🎲 Número ${num} está ocupado!`);
+    }
+    return result;
+  };
+  const isMeu = (num: number) => meusNumerosList.some(m => Number(m) === Number(num));
+  const isSelected = (num: number) => multiSelect
+    ? selectedNumbers.includes(num)
+    : selected === num;
+  const canSelectMore = multiSelect && selectedNumbers.length < maxNumbers;
+
+  const handleNumberClick = (num: number) => {
+    // Prevent selection while loading occupied positions
+    if (loading) return;
+
+    if (jogo.estado !== 'ativo' || readOnly) {
+      // Allow clicking on occupied numbers for admins
+      if (isOcupado(num) && isAdminOrVendedor && onOccupiedClick) {
+        onOccupiedClick(num);
+      }
+      return;
+    }
+
+    // If occupied and admin, show info
+    if (isOcupado(num) && !isMeu(num)) {
+      if (isAdminOrVendedor && onOccupiedClick) {
+        onOccupiedClick(num);
+      }
+      return;
+    }
+
+    // Can't select if it's occupied by someone else
+    if (isOcupado(num) && !isMeu(num)) return;
+
+    if (multiSelect && onToggleNumber) {
+      // Multi-select mode - allow deselecting own numbers
+      if (isMeu(num) && selectedNumbers.includes(num)) {
+        onToggleNumber(num);
+      } else if (!isOcupado(num) && (selectedNumbers.includes(num) || canSelectMore)) {
+        onToggleNumber(num);
+      }
+    } else {
+      // Single-select mode
+      if (!isOcupado(num) || isMeu(num)) {
+        onSelect(num);
+      }
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Multi-select info */}
+      {multiSelect && (
+        <div className="flex items-center justify-between p-2 bg-green-50 border border-green-200 rounded-lg">
+          <div className="flex items-center gap-2">
+            <Hash className="w-4 h-4 text-green-600" />
+            <span className="text-sm font-medium text-green-700">
+              Selecionados: {selectedNumbers.length}/{maxNumbers}
+            </span>
+          </div>
+          <span className="text-sm font-bold text-green-700">
+            Total: {(selectedNumbers.length * jogo.precoParticipacao).toFixed(2)}€
+          </span>
+        </div>
+      )}
+
+      {/* Legenda */}
+      <div className="flex items-center gap-4 text-xs">
+        <div className="flex items-center gap-1">
+          <div className="w-4 h-4 bg-blue-500 rounded"></div>
+          <span className="text-muted-foreground">Meus</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <div className="w-4 h-4 bg-red-100 rounded"></div>
+          <span className="text-muted-foreground">Ocupados</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <div className="w-4 h-4 bg-gray-100 rounded"></div>
+          <span className="text-muted-foreground">Disponíveis</span>
+        </div>
+      </div>
+
+      {loading && (
+        <div className="flex items-center justify-center py-4">
+          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+          <span className="text-sm text-muted-foreground">A carregar números...</span>
+        </div>
+      )}
+      <div className="grid grid-cols-10 gap-1">
+        {Array.from({ length: fim - inicio }).map((_, i) => {
+          const num = inicio + i + 1;
+          const selected = isSelected(num);
+          const occupied = isOcupado(num);
+          const meu = isMeu(num);
+          const canSelect = jogo.estado === 'ativo' && !readOnly && (!occupied || meu) && !loading;
+          const disabledInMulti = multiSelect && !selected && !canSelectMore;
+
+          return (
+            <button
+              key={i}
+              type="button"
+              onClick={() => handleNumberClick(num)}
+              disabled={loading || (!canSelect && !disabledInMulti && (!occupied || !isAdminOrVendedor))}
+              className={cn(
+                "w-8 h-8 rounded text-xs font-medium transition-all",
+                loading ? "bg-gray-100 text-gray-400 cursor-wait" :
+                selected
+                  ? "bg-green-500 text-white scale-110 font-bold ring-2 ring-green-300"
+                  : meu
+                    ? "bg-blue-500 text-white font-bold hover:bg-blue-600"
+                    : occupied
+                      ? "bg-red-100 text-red-600 cursor-pointer hover:bg-red-200"
+                      : disabledInMulti
+                        ? "bg-gray-100 text-gray-400 cursor-not-allowed opacity-50"
+                        : "bg-gray-100 hover:bg-green-50",
+                !canSelect && !occupied && !disabledInMulti && !meu && !loading && "cursor-not-allowed opacity-50"
+              )}
+              title={
+                loading ? "A carregar..." :
+                selected ? `Selecionado: ${num}` :
+                meu ? `Meu: ${num}` :
+                occupied ? (isAdminOrVendedor ? "Clique para ver quem jogou" : "Já ocupado") :
+                `Número ${num}`
+              }
+            >
+              {loading ? <Loader2 className="h-3 w-3 animate-spin mx-auto" /> : meu && !selected ? '★' : num}
+            </button>
+          );
+        })}
+      </div>
+      {total > numerosPorPagina && (
+        <div className="flex justify-center gap-2 items-center">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPagina(p => Math.max(0, p - 1))}
+            disabled={pagina === 0}
+          >
+            Anterior
+          </Button>
+          <span className="text-sm text-muted-foreground min-w-[100px] text-center">
+            {inicio + 1}-{fim} de {total}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPagina(p => p + 1)}
+            disabled={fim >= total}
+          >
+            Próximo
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Notificações Modal Component
+function NotificacoesModal({
+  open,
+  onClose,
+  notificacoes,
+  naoLidas,
+  onMarcarLidas,
+  loading
+}: {
+  open: boolean;
+  onClose: () => void;
+  notificacoes: any[];
+  naoLidas: number;
+  onMarcarLidas: () => void;
+  loading: boolean;
+}) {
+  const getTipoIcon = (tipo: string) => {
+    switch (tipo) {
+      case 'evento_novo': return <Calendar className="h-4 w-4 text-blue-500" />;
+      case 'jogo_novo': return <Gamepad2 className="h-4 w-4 text-green-500" />;
+      case 'sorteio': return <Trophy className="h-4 w-4 text-yellow-500" />;
+      case 'participacao': return <Ticket className="h-4 w-4 text-purple-500" />;
+      default: return <Bell className="h-4 w-4 text-gray-500" />;
+    }
+  };
+
+  const getTipoBg = (tipo: string) => {
+    switch (tipo) {
+      case 'evento_novo': return 'bg-blue-50 dark:bg-blue-950';
+      case 'jogo_novo': return 'bg-green-50 dark:bg-green-950';
+      case 'sorteio': return 'bg-yellow-50 dark:bg-yellow-950';
+      case 'participacao': return 'bg-purple-50 dark:bg-purple-950';
+      default: return 'bg-gray-50 dark:bg-gray-900';
+    }
+  };
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-start justify-center p-4 pt-20"
+          onClick={onClose}
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: -20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: -20 }}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md"
+          >
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <div className="flex items-center gap-2">
+                  <Bell className="h-5 w-5" />
+                  <CardTitle className="text-lg">Notificações</CardTitle>
+                  {naoLidas > 0 && (
+                    <Badge variant="destructive" className="ml-2">{naoLidas}</Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  {naoLidas > 0 && (
+                    <Button variant="ghost" size="sm" onClick={onMarcarLidas}>
+                      Marcar lidas
+                    </Button>
+                  )}
+                  <Button variant="ghost" size="icon" onClick={onClose}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                    <span className="text-muted-foreground">A carregar...</span>
+                  </div>
+                ) : notificacoes.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Bell className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                    <p>Sem notificações</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3 max-h-96 overflow-y-auto">
+                    {notificacoes.map((n, idx) => (
+                      <motion.div
+                        key={n.id}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: idx * 0.05 }}
+                        className={cn(
+                          "p-3 rounded-lg border",
+                          n.lida ? "bg-background" : getTipoBg(n.tipo),
+                          !n.lida && "border-l-4 border-l-primary"
+                        )}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="mt-0.5">{getTipoIcon(n.tipo)}</div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm">{n.titulo}</p>
+                            <p className="text-xs text-muted-foreground mt-1">{n.mensagem}</p>
+                            <p className="text-xs text-muted-foreground mt-2">
+                              {new Date(n.createdAt).toLocaleString('pt-PT')}
+                            </p>
+                          </div>
+                          {!n.lida && (
+                            <div className="w-2 h-2 rounded-full bg-primary mt-2" />
+                          )}
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}

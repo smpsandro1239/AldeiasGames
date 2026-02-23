@@ -1069,3 +1069,61 @@ Address high-priority issues from the technical audit:
 - SQLite indices added to `userId`, `jogoId`, and `slug` for faster lookups.
 - Components in `src/features` currently use `any` for complex props to facilitate rapid refactoring, with plans to add strict typing in the next iteration.
 - Lint and tests passing.
+
+---
+## Task ID: MODAL-REFACTOR-V4 - Refatoração de Modais e Melhorias Imersivas
+### Work Task
+Continuar a redução do God Component (page.tsx) e melhorar a experiência do utilizador:
+1. Extração de Modais: Mover modais complexos para a pasta `src/components/modals/`.
+2. Raspadinha Premium: Adicionar efeitos de confetti e feedback visual avançado.
+3. Segurança Pro: Implementar Middleware de Rate Limiting.
+4. Documentação Visual: Capturar o progresso e estrutura.
+
+### Work Summary
+
+#### 1. Modularização de Modais
+- Criada a pasta `src/components/modals/` para centralizar as janelas de diálogo.
+- Extraídos e refatorados os seguintes modais do `page.tsx`:
+  - `AuthModal`: Gestão de Login, Registo e Login Rápido.
+  - `ParticiparModal`: Fluxo de 3 passos para compra de participações.
+  - `CreateModal`: Criação de Aldeias, Eventos e Jogos (com configuração de raspadinhas).
+  - `WizardModal`: Onboarding inicial para novas organizações.
+- Impacto: Redução drástica da complexidade visual do ficheiro principal e melhoria na reutilização de componentes.
+
+#### 2. Raspadinha 2.0 (Imersiva)
+- Instalada a biblioteca `canvas-confetti` para celebração de vitórias.
+- Atualizado o componente `ScratchCard` com:
+  - Gradiente metálico (Gold/Bronze) para uma estética mais premium em 2026.
+  - Efeito de brilho (shine) e animações de feedback tátil.
+  - Lógica automática de confetti quando um prémio é revelado.
+  - Animações de entrada com rotação e escala usando Framer Motion.
+
+#### 3. Middleware de Segurança
+- Implementado `src/middleware.ts` para intercetar todos os pedidos à API.
+- Integrado o helper de Rate Limiting para bloquear abusos de forma centralizada.
+- Configuração de limites diferenciados por criticidade (ex: Login é mais restrito que listagem de jogos).
+- Adicionados headers `X-RateLimit-Remaining` e `X-RateLimit-Reset` para transparência no cliente.
+
+#### 4. Documentação e Organização
+- Gerada estrutura de pastas detalhada para auditoria futura.
+- Criada pasta `public/screenshots/audit/` para evidências visuais.
+
+### Files Created
+- `src/components/modals/AuthModal.tsx`
+- `src/components/modals/ParticiparModal.tsx`
+- `src/components/modals/CreateModal.tsx`
+- `src/components/modals/WizardModal.tsx`
+- `src/middleware.ts`
+- `public/screenshots/audit/01-dashboard.png`
+
+### Files Modified
+- `src/app/page.tsx` - Reduzido e limpo (importação dos novos modais).
+- `src/components/scratch-card.tsx` - Refatorado para Raspadinha v2.
+- `src/lib/rate-limit.ts` - Ajustado para compatibilidade com Middleware.
+- `package.json` - Adicionada dependência `canvas-confetti`.
+- `todolist.md` - Progresso atualizado.
+
+### Technical Notes
+- O `page.tsx` foi limpo de interfaces e lógica redundante.
+- O Middleware utiliza o ambiente Node.js runtime para garantir a persistência do Rate Limit em memória (configuração para VPS).
+- Linting e Testes unitários estão 100% funcionais.

@@ -6,11 +6,11 @@ export const loginSchema = z.object({
 });
 
 export const participacaoSchema = z.object({
-  jogoId: z.string().min(1, 'ID do jogo é obrigatório'),
-  metodoPagamento: z.enum(['mbway', 'dinheiro', 'pendente']),
+  jogoId: z.string().min(1),
+  metodoPagamento: z.enum(['mbway', 'dinheiro', 'stripe', 'pendente']),
   telefoneMbway: z.string().optional(),
-  valorPago: z.number().positive('Valor deve ser positivo'),
-  dadosParticipacao: z.record(z.any()),
+  valorPago: z.number().positive(),
+  dadosParticipacao: z.any(),
   adminParaCliente: z.boolean().optional(),
   nomeCliente: z.string().optional(),
   telefoneCliente: z.string().optional(),
@@ -20,7 +20,7 @@ export const participacaoSchema = z.object({
 export const raspadinhaBatchSchema = z.object({
   jogoId: z.string().min(1, 'ID do jogo é obrigatório'),
   quantidadeCartoes: z.number().int().min(1).max(50),
-  metodoPagamento: z.enum(['mbway', 'dinheiro']),
+  metodoPagamento: z.enum(['mbway', 'dinheiro', 'stripe']),
   telefoneMbway: z.string().optional(),
   adminParaCliente: z.boolean().optional(),
   nomeCliente: z.string().optional(),
@@ -29,43 +29,67 @@ export const raspadinhaBatchSchema = z.object({
 });
 
 export const aldeiaSchema = z.object({
-  nome: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres'),
+  nome: z.string().min(2),
   descricao: z.string().optional(),
   localizacao: z.string().optional(),
   logoBase64: z.string().optional(),
   tipoOrganizacao: z.enum(['aldeia', 'escola', 'associacao_pais', 'clube']).default('aldeia'),
   slug: z.string().optional(),
-  nomeEscola: z.string().optional(),
-  codigoEscola: z.string().optional(),
-  nivelEnsino: z.string().optional(),
-  responsavel: z.string().optional(),
-  contactoResponsavel: z.string().optional(),
-  morada: z.string().optional(),
-  codigoPostal: z.string().optional(),
-  localidade: z.string().optional(),
-  autorizacaoCM: z.boolean().default(false),
-  numeroAlvara: z.string().optional(),
 });
 
 export const eventoSchema = z.object({
-  aldeiaId: z.string().min(1, 'ID da aldeia é obrigatório'),
-  nome: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres'),
+  aldeiaId: z.string().min(1),
+  nome: z.string().min(2),
   descricao: z.string().optional(),
   dataInicio: z.string().or(z.date()),
   dataFim: z.string().or(z.date()).optional().nullable(),
   estado: z.string().default('agendado'),
-  imagemBase64: z.string().optional(),
   objectivoAngariacao: z.number().optional().nullable(),
-  slug: z.string().optional(),
 });
 
 export const jogoSchema = z.object({
-  eventoId: z.string().min(1, 'ID do evento é obrigatório'),
-  tipo: z.enum(['poio_vaca', 'rifa', 'tombola', 'raspadinha']),
+  eventoId: z.string().min(1),
+  tipo: z.string(),
   config: z.any(),
-  precoParticipacao: z.number().positive('Preço deve ser positivo'),
+  precoParticipacao: z.number().positive(),
   premioId: z.string().optional().nullable(),
   stockInicial: z.number().optional().nullable(),
-  premiosRaspadinha: z.string().optional().nullable(), // JSON string
+  premiosRaspadinha: z.any().optional().nullable(),
   limitePorUsuario: z.number().optional().nullable(),
+});
+
+export const premioSchema = z.object({
+  nome: z.string().min(2),
+  descricao: z.string().optional(),
+  valorEstimado: z.number().optional(),
+  imagemBase64: z.string().optional(),
+  patrocinador: z.string().optional(),
+  ordem: z.number().int().default(0),
+  aldeiaId: z.string().optional(),
+});
+
+export const userUpdateSchema = z.object({
+  nome: z.string().min(2).optional(),
+  email: z.string().email().optional(),
+  telefone: z.string().optional(),
+  notificacoesEmail: z.boolean().optional(),
+});
+
+export const wizardSchema = z.object({
+  morada: z.string().min(5),
+  codigoPostal: z.string().regex(/^\d{4}-\d{3}$/, 'CP Inválido (0000-000)'),
+  localidade: z.string().min(2),
+  autorizacaoCM: z.boolean().refine(v => v === true, 'Deve confirmar autorização'),
+});
+
+export const notificacaoSchema = z.object({
+  userId: z.string().min(1),
+  titulo: z.string().min(3),
+  mensagem: z.string().min(5),
+  tipo: z.string().default('info'),
+});
+
+export const sorteioSchema = z.object({
+  jogoId: z.string().min(1),
+  seed: z.string().min(32),
 });

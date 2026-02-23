@@ -1,8 +1,9 @@
 import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
+import { User, Participacao, Jogo } from '@/types/project';
 
-export function useParticipacoes(user: any, onParticipacaoSuccess?: () => void) {
-  const [minhasParticipacoes, setMinhasParticipacoes] = useState<any[]>([]);
+export function useParticipacoes(user: User | null, onParticipacaoSuccess?: () => void) {
+  const [minhasParticipacoes, setMinhasParticipacoes] = useState<Participacao[]>([]);
   const [loading, setLoading] = useState(false);
   const [participacaoLoading, setParticipacaoLoading] = useState(false);
 
@@ -28,7 +29,7 @@ export function useParticipacoes(user: any, onParticipacaoSuccess?: () => void) 
   }, [user]);
 
   const handleParticipar = useCallback(async (
-    jogo: any,
+    jogo: Jogo,
     dados: any,
     metodo: string,
     telefone: string,

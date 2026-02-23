@@ -86,3 +86,4 @@ export interface Evento {
   ativo?: boolean;
   _count?: { jogos: number };
 }
+export const DUMMY = 1;

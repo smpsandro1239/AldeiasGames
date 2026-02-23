@@ -1,62 +1,61 @@
 # 📋 TODOLIST - Aldeias Games
 
 > Última atualização: 2026-02-23
-> Progresso: 98% (Refatoração Contínua)
-> Versão: 3.9.1-dev (Auditoria & Refactor)
+> Progresso: 85% (Qualidade de Código)
+> Versão: 3.10.0-refactor
 
 ---
 
-## 🔴 PRIORIDADE CRÍTICA - Segurança e Arquitetura
-
-### Segurança JWT ✅
-- [x] Remover fallback hardcoded da chave JWT em `src/lib/auth.ts`
-- [x] Adicionar validação de existência de `JWT_SECRET` no arranque
-
-### Gestão de Base de Dados ✅
-- [x] Implementar Singleton Pattern robusto no `src/lib/db.ts` para evitar fugas de conexão
+## 🔴 PRIORIDADE CRÍTICA - Refatoração e Segurança
 
 ### Refatoração "God Component" (page.tsx) 🏗️
 - [x] Extrair tipos para `src/types/project.ts`
-- [x] Extrair sub-componentes UI (Skeletons, Modais) para ficheiros separados
+- [x] Extrair sub-componentes UI (Skeletons, Modais)
 - [x] Extrair `ScratchCard` e `RifaNumberSelector`
-- [ ] Extrair lógica de estado e chamadas API para hooks customizados (Pendente)
-- [🏗️] Reduzir `src/app/page.tsx` (Reduzido em ~800 linhas até agora)
+- [x] Extrair logic para `useAuthLogic` e `useDashboardData`
+- [x] Extrair `AdminDashboardView`, `VendedorDashboardView`, `PublicGamesView`, `PlayerParticipationsView`
+- [ ] Mover modais complexos para ficheiros separados (Pendente)
+- [🏗️] Reduzir `src/app/page.tsx` (Reduzido em ~2.3k linhas)
+
+### Gestão de Media ✅
+- [x] Implementar sistema de armazenamento local (`src/lib/storage.ts`)
+- [x] Migrar `Aldeias`, `Eventos` e `Prémios` de Base64 para `imageUrl`
+- [ ] Script de migração para imagens existentes (Pendente)
 
 ---
 
-## 🟠 PRIORIDADE ALTA - Performance e Robustez
-
-### Otimização de Queries ✅
-- [x] Substituir `findMany().find()` por `findFirst()` nativo em `src/app/api/participacoes/route.ts`
-- [x] Adicionar índices no schema Prisma para campos de busca frequente (slug, jogoId, userId)
+## 🟠 PRIORIDADE ALTA - Performance e Validação
 
 ### Validação de Dados ✅
-- [x] Implementar **Zod** para validação de payloads nas rotas críticas (Login, Participações)
-- [ ] Tipagem rigorosa em todos os retornos de API (Pendente)
+- [x] Criar schemas Zod em `src/lib/validations.ts`
+- [x] Implementar validação em todas as rotas críticas (Login, Aldeias, Eventos, Jogos, Participações)
+
+### Performance de Queries ✅
+- [x] Substituir filtragem em memória por queries nativas
+- [x] Adicionar índices no schema Prisma (Slug, UserId, JogoId)
 
 ---
 
-## 🟡 PRIORIDADE MÉDIA - Funcionalidades e Manutenção
+## 🟡 PRIORIDADE MÉDIA - Funcionalidades e UX
 
-### Sistema de Backups ✅
-- [x] Alterar método de cópia direta para `VACUUM INTO` do SQLite para garantir consistência
+### Feature Parity (2026) 🏗️
+- [x] Componente `FundingGoal` (Barra de progresso de angariação)
+- [ ] Som e animações avançadas na Raspadinha (Pendente)
+- [ ] Integração real com Stripe (Pendente)
 
-### Gestão de Media 🏗️
-- [ ] Migrar armazenamento de imagens Base64 para Filesystem ou S3-compatible storage
-
-### DevOps & Testes ✅
-- [x] Corrigir `jest.config.ts` (erro de importação do Next.js)
-- [x] Adicionar polyfills para TextEncoder/Decoder nos testes
-- [ ] Implementar testes de integração para fluxos críticos (Login, Participação, Sorteio)
+### DevOps & Documentação 🏗️
+- [x] Corrigir configuração de Jest e Testes
+- [ ] Criar documentação OpenAPI/Swagger
+- [ ] Implementar middleware para Rate Limiting global
 
 ---
 
 ## ✅ CONCLUÍDO (Histórico)
-- [x] Multi-tenancy (Aldeias/Escolas/Clubes)
-- [x] Tipos de Jogos (Poio da Vaca, Rifa, Tombola, Raspadinhas)
-- [x] Sistema de Roles completo
-- [x] Auditoria de Sorteios
-- [x] Exportação PDF/CSV e RGPD
+- [x] Multi-tenancy completo
+- [x] Sistema de Roles (4 níveis)
+- [x] Auditoria de Sorteios (Seed/Hash)
+- [x] Exportação PDF/CSV e conformidade RGPD inicial
+- [x] Backups atómicos com `VACUUM INTO`
 
 ---
 
@@ -65,9 +64,9 @@
 | Área | Status |
 |------|--------|
 | Segurança | 100% ✅ |
-| Arquitetura | 85% |
+| Arquitetura | 60% |
 | Performance | 95% |
-| Funcionalidades | 100% |
+| Funcionalidades | 90% |
 
 ---
 

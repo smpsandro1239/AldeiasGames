@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { participacaoSchema, raspadinhaBatchSchema } from '@/lib/validations';
+import { ZodError } from 'zod';
 import { getUserFromRequest } from '@/lib/auth';
 import { generateParticipacaoEmail, generateAdminNotificationEmail } from '../emails/route';
 import crypto from 'crypto';
@@ -334,12 +336,18 @@ export async function POST(request: Request) {
     }
 
     // === OUTROS JOGOS ===
-    if (!jogoId || !dadosParticipacao || !valorPago || !metodoPagamento) {
-      return NextResponse.json(
-        { error: 'Jogo, dados, valor e método de pagamento são obrigatórios' },
-        { status: 400 }
-      );
-    }
+    const validatedParticipacao = participacaoSchema.parse(body);
+    const {
+      jogoId,
+      dadosParticipacao,
+      valorPago,
+      metodoPagamento,
+      telefoneMbway,
+      adminParaCliente,
+      nomeCliente,
+      telefoneCliente,
+      emailCliente
+    } = validatedParticipacao;
 
     if (metodoPagamento === 'mbway' && !telefoneMbway) {
       return NextResponse.json(
@@ -348,62 +356,16 @@ export async function POST(request: Request) {
       );
     }
 
-    // Verificar duplicados - comparação robusta campo a campo
-    // Para Rifa/Tombola: comparar numero
-    // Para Poio da Vaca: comparar letra + numero
-    let existente;
-    
-    if (dadosParticipacao.letra !== undefined) {
-      // Poio da Vaca - verificar letra e numero
-      const dadosStr = JSON.stringify(dadosParticipacao);
-      existente = await db.participacao.findFirst({
-        where: {
-          jogoId,
-          dadosParticipacao: dadosStr
-        }
-      });
-      
-      // Se não encontrou com stringify exato, tentar buscar todos e comparar
-      if (!existente) {
-        const todasParticipacoes = await db.participacao.findMany({
-          where: { jogoId }
-        });
-        
-        existente = todasParticipacoes.find(p => {
-          try {
-            const dados = JSON.parse(p.dadosParticipacao);
-            return dados.letra === dadosParticipacao.letra && dados.numero === dadosParticipacao.numero;
-          } catch {
-            return false;
-          }
-        });
+    // Verificar duplicados
+    // Usamos uma abordagem determinística para o stringify e confiamos no findFirst.
+    // O fallback de carregar tudo em memória foi removido por performance.
+    const dadosStr = JSON.stringify(dadosParticipacao);
+    let existente = await db.participacao.findFirst({
+      where: {
+        jogoId,
+        dadosParticipacao: dadosStr
       }
-    } else {
-      // Rifa/Tombola - verificar numero
-      const dadosStr = JSON.stringify(dadosParticipacao);
-      existente = await db.participacao.findFirst({
-        where: {
-          jogoId,
-          dadosParticipacao: dadosStr
-        }
-      });
-      
-      // Se não encontrou com stringify exato, tentar buscar todos e comparar
-      if (!existente) {
-        const todasParticipacoes = await db.participacao.findMany({
-          where: { jogoId }
-        });
-        
-        existente = todasParticipacoes.find(p => {
-          try {
-            const dados = JSON.parse(p.dadosParticipacao);
-            return dados.numero === dadosParticipacao.numero;
-          } catch {
-            return false;
-          }
-        });
-      }
-    }
+    });
 
     if (existente) {
       return NextResponse.json(
@@ -532,6 +494,9 @@ export async function POST(request: Request) {
         : 'Participação registada! Dirija-se à organização para efetuar o pagamento.'
     }, { status: 201 });
   } catch (error: any) {
+    if (error instanceof ZodError) {
+      return NextResponse.json({ error: error.errors[0].message }, { status: 400 });
+    }
     if (error.code === 'P2002') {
       return NextResponse.json(
         { error: 'Esta participação já foi comprada' },

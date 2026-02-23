@@ -14,7 +14,7 @@ model User {
   id                   String                  @id @default(cuid())
   nome                 String
   email                String                  @unique
-  password             String
+  passwordHash         String
   role                 String                  @default("CLIENTE") // SUPER_ADMIN, ADMIN, VENDEDOR, CLIENTE
   telefone             String?
   notificacoesEmail    Boolean                 @default(true)
@@ -84,7 +84,7 @@ model Jogo {
   eventoId          String
   titulo            String
   tipo              String
-  configuracao      String?        // JSON string
+  config            String?        // JSON string
   precoParticipacao Float
   estado            String         @default("ativo")
   premioId          String?
@@ -120,9 +120,15 @@ model Participacao {
   nomeCliente       String?
   telefoneCliente   String?
   emailCliente      String?
+
+  // === Raspadinha ===
   numeroCartao      Int?
-  seed              String?
-  hash              String?
+  seedRaspe         String?
+  hashRaspe         String?
+  resultadoRaspe    String?
+  revelado          Boolean   @default(false)
+  reveladoAt        DateTime?
+
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
   user              User      @relation(fields: [userId], references: [id])

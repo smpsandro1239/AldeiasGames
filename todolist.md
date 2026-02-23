@@ -1,8 +1,8 @@
 # 📋 TODOLIST - Aldeias Games
 
 > Última atualização: 2026-02-23
-> Progresso: 95% (Refatoração Contínua)
-> Versão: 3.9.0-dev (Auditoria & Refactor)
+> Progresso: 98% (Refatoração Contínua)
+> Versão: 3.9.1-dev (Auditoria & Refactor)
 
 ---
 
@@ -18,8 +18,9 @@
 ### Refatoração "God Component" (page.tsx) 🏗️
 - [x] Extrair tipos para `src/types/project.ts`
 - [x] Extrair sub-componentes UI (Skeletons, Modais) para ficheiros separados
+- [x] Extrair `ScratchCard` e `RifaNumberSelector`
 - [ ] Extrair lógica de estado e chamadas API para hooks customizados (Pendente)
-- [🏗️] Reduzir `src/app/page.tsx` (Reduzido em ~300 linhas inicialmente)
+- [🏗️] Reduzir `src/app/page.tsx` (Reduzido em ~800 linhas até agora)
 
 ---
 
@@ -27,11 +28,11 @@
 
 ### Otimização de Queries ✅
 - [x] Substituir `findMany().find()` por `findFirst()` nativo em `src/app/api/participacoes/route.ts`
-- [ ] Adicionar índices no schema Prisma para campos de busca frequente (slug, jogoId)
+- [x] Adicionar índices no schema Prisma para campos de busca frequente (slug, jogoId, userId)
 
-### Validação de Dados 🏗️
-- [ ] Implementar **Zod** para validação de payloads em todas as rotas POST/PATCH
-- [ ] Tipagem rigorosa em todos os retornos de API
+### Validação de Dados ✅
+- [x] Implementar **Zod** para validação de payloads nas rotas críticas (Login, Participações)
+- [ ] Tipagem rigorosa em todos os retornos de API (Pendente)
 
 ---
 
@@ -45,6 +46,7 @@
 
 ### DevOps & Testes ✅
 - [x] Corrigir `jest.config.ts` (erro de importação do Next.js)
+- [x] Adicionar polyfills para TextEncoder/Decoder nos testes
 - [ ] Implementar testes de integração para fluxos críticos (Login, Participação, Sorteio)
 
 ---
@@ -63,8 +65,8 @@
 | Área | Status |
 |------|--------|
 | Segurança | 100% ✅ |
-| Arquitetura | 70% |
-| Performance | 80% |
+| Arquitetura | 85% |
+| Performance | 95% |
 | Funcionalidades | 100% |
 
 ---

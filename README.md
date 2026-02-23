@@ -1,248 +1,123 @@
 # 🎮 Aldeias Games
 
-> Plataforma SaaS multi-tenant para angariação de fundos através de jogos tradicionais portugueses.
+> **Plataforma SaaS multi-tenant para angariação de fundos através de jogos tradicionais.**
 
-![Progresso](https://img.shields.io/badge/Progresso-100%25-brightgreen)
-![Versão](https://img.shields.io/badge/Versão-3.0--dev-blue)
-![License](https://img.shields.io/badge/License-MIT-green)
+[![Versão](https://img.shields.io/badge/Versão-3.8.1--dev-blue)](https://github.com)
+[![Licença](https://img.shields.io/badge/Licença-MIT-green)](LICENSE)
+[![Next.js](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org)
+[![Tailwind](https://img.shields.io/badge/Tailwind-4-38b2ac)](https://tailwindcss.com)
+
+## 📋 Índice
+1. [Sobre](#-sobre)
+2. [Objetivos](#-objetivos)
+3. [Funcionalidades](#-funcionalidades)
+4. [Arquitetura Técnica](#-arquitetura-técnica)
+5. [Instalação](#-instalação)
+6. [Estrutura de Pastas](#-estrutura-de-pastas)
+7. [Problemas Conhecidos](#-problemas-conhecidos)
+8. [Roadmap](#-roadmap)
 
 ---
 
 ## 📖 Sobre
 
-**Aldeias Games** é uma plataforma que permite a aldeias e organizações locais angariar fundos através de jogos tradicionais portugueses como:
+**Aldeias Games** é uma solução digital inovadora desenhada para apoiar aldeias, associações de pais, escolas e clubes na sua missão de angariação de fundos. Através da digitalização de jogos clássicos como o "Poio da Vaca", a plataforma oferece transparência, facilidade de participação e gestão profissional.
 
-- 🐄 **Poio da Vaca** - Escolha uma coordenada na grelha
-- 🎟️ **Rifa** - Compre números da sorte
-- 🎲 **Tombola** - Bilhetes tradicionais
+## 🎯 Objetivos
+- Facilitar a angariação de fundos para comunidades locais.
+- Garantir a **transparência total** nos sorteios através de criptografia.
+- Oferecer uma experiência moderna e acessível (Mobile-first & PWA).
+- Centralizar a gestão de múltiplos eventos e organizações numa única infraestrutura (SaaS).
 
-### Características Principais
+## ✨ Funcionalidades
 
-- ✅ **Multi-tenant** - Cada aldeia tem o seu próprio espaço
-- ✅ **Sorteios Transparentes** - Com verificação criptográfica
-- ✅ **Dashboard Completo** - Para admins e vendedores
-- ✅ **PWA** - Funciona offline
-- ✅ **Mobile-First** - Design responsivo
-- ✅ **Dark Mode** - Tema claro/escuro
-- ✅ **Upload de Imagens** - Base64, sem dependências externas
-- ✅ **Backup/Restore** - Sistema completo de backups
-- ✅ **Histórico de Pagamentos** - Controlo de gastos para jogadores
-- ✅ **Logs de Acesso** - Auditoria de logins
-- ✅ **Exportação CSV** - Relatórios completos
-- ✅ **RGPD Compliant** - Exportar/apagar dados pessoais
-- ✅ **Rate Limiting** - Proteção contra abuso
-- ✅ **Anular/Trocar Participações** - Gestão completa de participações
-- ✅ **Permissões por Role** - Vendedores só alteram suas vendas
-- ✅ **Tipos de Organização** (v3.0) - Aldeias, Escolas, Associações de Pais, Clubes
-- ✅ **Sistema de Prémios** (v3.0) - Gestão de prémios por jogo
-- ✅ **Conformidade Legal** (v3.0) - Autorizações e alvarás
+### Existentes ✅
+- **Multi-tenancy**: Isolamento total entre aldeias e organizações.
+- **Jogos Customizáveis**:
+  - 🐄 **Poio da Vaca**: Grelha interativa com coordenadas.
+  - 🎟️ **Rifa/Tombola**: Números da sorte.
+  - 🃏 **Raspadinhas**: Resultados imediatos com seed verificável.
+- **Gestão de Roles**: 4 níveis de permissão (Super Admin -> Admin -> Vendedor -> Jogador).
+- **Relatórios**: Exportação em CSV e PDF.
+- **Auditoria**: Logs de acesso e histórico de alterações em participações.
+- **Backups**: Sistema de proteção de dados integrado.
+- **RGPD**: Ferramentas de exportação e eliminação de dados pessoais.
 
----
+### Em Falta / Planeadas ⏳
+- 💳 Integração completa com Stripe (Pagamentos Online).
+- 📱 App Móvel Nativa (API pronta, app em planeamento).
+- 🔔 Notificações Push em tempo real.
+- 🔗 Webhooks para integrações externas.
 
-## 🚀 Quick Start
+## ⚙️ Arquitetura Técnica
 
+A plataforma utiliza uma stack moderna focada em performance e DX:
+
+- **Frontend**: React 19 + Next.js 16 (App Router).
+- **Estilos**: Tailwind CSS 4 com suporte nativo a Dark Mode.
+- **Base de Dados**: SQLite gerenciado via Prisma ORM.
+- **Estado**: Zustand para estado global e React Query para cache de servidor.
+- **Segurança**: Autenticação baseada em JWT (Jose) com hashing Bcrypt.
+
+### Fluxo de Sorteio Transparente
+1. Uma `seed` aleatória é gerada.
+2. O `hash` da seed é publicado antes do sorteio.
+3. Após o sorteio, a `seed` é revelada, permitindo que qualquer utilizador valide o resultado usando o algoritmo padrão.
+
+## 🚀 Instalação
+
+### Pré-requisitos
+- Node.js 20+ ou **Bun** (recomendado)
+- SQLite
+
+### Passos
 ```bash
-# Instalar dependências
+# 1. Clonar o repositório
+git clone https://github.com/org/aldeias-games.git
+
+# 2. Instalar dependências
 bun install
 
-# Correr o seed para criar utilizadores de teste
-bunx tsx prisma/seed.ts
+# 3. Configurar ambiente
+cp .env.example .env
 
-# Iniciar servidor de desenvolvimento
-bun run dev
+# 4. Preparar base de dados
+bunx prisma db push
+bunx prisma db seed
 
-# Aplicação disponível em http://localhost:3000
+# 5. Iniciar desenvolvimento
+bun dev
 ```
 
----
+## 📂 Estrutura de Pastas
 
-## 🔐 Sistema de Roles
-
-A plataforma possui 4 tipos de utilizadores:
-
-| Role | Descrição |
-|------|-----------|
-| **Super Admin** | Controlo total da plataforma |
-| **Admin Aldeia** | Gestão de uma aldeia específica |
-| **Vendedor** | Angariador de fundos |
-| **Jogador** | Participante normal |
-
-📖 [Ver documentação completa de roles](./roles.md)
-
----
-
-## 🧪 Contas de Teste
-
-| Role | Email | Password |
-|------|-------|----------|
-| Super Admin | admin@aldeias.pt | 123456 |
-| Admin Aldeia | aldeia@gmail.com | 123456 |
-| Vendedor | vendedor@gmail.com | 123456 |
-| Jogador | smpsandro1239@gmail.com | 123456 |
-
-> ⚠️ **Importante**: Se os logins rápidos não funcionarem, execute `bunx tsx prisma/seed.ts` para criar os utilizadores de teste.
-
----
-
-## 📊 Progresso do Projeto
-
-| Secção | Progresso |
-|--------|-----------|
-| Autenticação | 100% ✅ |
-| Aldeias | 100% ✅ |
-| Eventos | 100% ✅ |
-| Jogos | 100% ✅ |
-| Participações | 100% ✅ |
-| Sorteios | 100% ✅ |
-| Billing | 78% |
-| Interface | 100% ✅ |
-| Auditoria | 100% ✅ |
-| Backup | 100% ✅ |
-| Pagamentos | 100% ✅ |
-| Logs | 100% ✅ |
-| RGPD | 100% ✅ |
-| **Roles** | **100% ✅** |
-| **Total** | **100%** |
-
-📖 [Ver todolist completo](./todolist.md)
-
----
-
-## 🛠️ Tecnologias
-
-### Core
-- **Next.js 16** - Framework React
-- **TypeScript** - Type safety
-- **Prisma** - ORM
-- **SQLite** - Base de dados
-
-### UI/UX
-- **Tailwind CSS** - Styling
-- **shadcn/ui** - Componentes
-- **Framer Motion** - Animações
-- **Lucide** - Ícones
-- **next-themes** - Dark mode
-
-### Features
-- **JWT Authentication** - Autenticação segura
-- **PWA** - Progressive Web App
-- **Multi-tenant** - Isolamento de dados
-- **Base64 Images** - Upload sem Cloudinary
-
----
-
-## 📁 Estrutura do Projeto
-
-```
+```text
 src/
-├── app/
-│   ├── api/           # API Routes
-│   │   ├── auth/      # Autenticação
-│   │   ├── aldeias/   # Gestão de aldeias
-│   │   ├── eventos/   # Gestão de eventos
-│   │   ├── jogos/     # Gestão de jogos
-│   │   ├── participacoes/ # Participações
-│   │   ├── sorteios/  # Sorteios
-│   │   ├── users/     # Gestão de utilizadores
-│   │   └── backup/    # Backup/restore
-│   ├── page.tsx       # Página principal
-│   ├── layout.tsx     # Layout
-│   └── globals.css    # Estilos globais
-├── components/
-│   └── ui/            # shadcn/ui components
-├── hooks/             # Custom hooks
-└── lib/               # Utilitários
-    ├── auth.ts        # Autenticação
-    ├── db.ts          # Base de dados
-    └── utils.ts       # Helpers
+├── app/                  # Rotas e API (App Router)
+│   ├── api/              # Endpoints da API REST
+│   └── (routes)/         # Páginas e Layouts
+├── components/           # Componentes UI (Shadcn)
+├── hooks/                # Hooks customizados
+├── lib/                  # Utilitários (Auth, DB, Utils)
+└── prisma/               # Schema e Migrações
 ```
 
----
+## ⚠️ Problemas Conhecidos e Auditoria
 
-## 🔧 API Endpoints
+Uma auditoria técnica recente identificou os seguintes pontos de atenção:
+- **Acoplamento**: A página principal (`page.tsx`) necessita de refatoração urgente (9k+ linhas).
+- **Segurança**: Necessidade de remover fallbacks de chaves JWT.
+- **Performance**: Armazenamento de imagens em Base64 no SQLite deve ser migrado para S3/Filesystem.
 
-### Autenticação
-- `POST /api/auth/login` - Login
-- `POST /api/auth/register` - Registro
+Para mais detalhes, consulte o [Relatório de Auditoria Técnica](./TECHNICAL_AUDIT.md).
 
-### Aldeias
-- `GET /api/aldeias` - Listar aldeias
-- `POST /api/aldeias` - Criar aldeia (super_admin)
-- `GET/PATCH/DELETE /api/aldeias/[id]` - CRUD aldeia
+## 🗺️ Roadmap Sugerido
 
-### Eventos
-- `GET /api/eventos` - Listar eventos
-- `POST /api/eventos` - Criar evento (admin)
-- `GET/PUT/DELETE /api/eventos/[id]` - CRUD evento
-
-### Jogos
-- `GET /api/jogos` - Listar jogos
-- `POST /api/jogos` - Criar jogo (admin)
-- `GET/PATCH/DELETE /api/jogos/[id]` - CRUD jogo
-
-### Participações
-- `GET /api/participacoes` - Listar participações
-- `POST /api/participacoes` - Criar participação
-- `PUT /api/participacoes/[id]/alterar` - Alterar (admin)
-- `GET /api/participacoes/[id]/historico` - Histórico
-
-### Utilizadores
-- `GET /api/users` - Listar utilizadores (admin)
-- `POST /api/users` - Criar vendedor (admin)
-- `GET/PATCH /api/users/perfil` - Perfil próprio
-
-### Backup
-- `GET /api/backup` - Listar backups
-- `POST /api/backup` - Criar backup
-- `POST /api/backup/restore` - Restaurar backup
-- `DELETE /api/backup/restore` - Apagar backup
+1. **Q1 2025**: Refatoração da interface principal e implementação de Zod.
+2. **Q2 2025**: Finalização da integração Stripe e Webhooks.
+3. **Q3 2025**: Lançamento da API Pública para App Móvel.
+4. **Q4 2025**: Implementação de WebSockets para atualizações em tempo real.
 
 ---
 
-## 📋 Funcionalidades Implementadas
-
-### ✅ Completas
-
-- [x] Sistema de autenticação completo
-- [x] 4 roles com permissões específicas
-- [x] Dashboard do vendedor
-- [x] Gestão de vendedores por aldeia
-- [x] Quick login para testes
-- [x] Sorteios transparentes e verificáveis
-- [x] Alteração de participações com auditoria
-- [x] Multi-seleção (até 10 participações)
-- [x] Pagamento em dinheiro e MBWay
-- [x] PWA offline
-- [x] Dark mode toggle
-- [x] Upload de imagens (base64)
-- [x] Sistema de backup/restore
-- [x] Edição de perfil
-- [x] Histórico de pagamentos detalhado
-- [x] Logs de acesso com IP e user agent
-- [x] Preferências de notificação
-- [x] Exportação de relatórios CSV
-- [x] RGPD - Exportar dados pessoais
-- [x] RGPD - Apagar conta (direito ao esquecimento)
-- [x] Rate limiting para proteção de API
-
-### ⏳ Pendentes (Config Externa)
-
-- [ ] Integração Stripe (requer chave Stripe)
-- [ ] Webhook Stripe (requer configuração Stripe)
-
----
-
-## 📄 Documentação
-
-- [📋 Todolist](./todolist.md) - Progresso detalhado
-- [🔐 Roles](./roles.md) - Sistema de permissões
-
----
-
-## 📝 Licença
-
-MIT License - Veja [LICENSE](LICENSE) para mais detalhes.
-
----
-
-Desenvolvido com ❤️ para as aldeias portuguesas.
+Desenvolvido com foco no impacto social e transparência. 🚀

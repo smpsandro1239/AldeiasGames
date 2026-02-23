@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { participacaoSchema, raspadinhaBatchSchema } from '@/lib/validations';
+import { ZodError } from 'zod';
 import { getUserFromRequest } from '@/lib/auth';
 import { generateParticipacaoEmail, generateAdminNotificationEmail } from '../emails/route';
 import crypto from 'crypto';
@@ -334,12 +336,18 @@ export async function POST(request: Request) {
     }
 
     // === OUTROS JOGOS ===
-    if (!jogoId || !dadosParticipacao || !valorPago || !metodoPagamento) {
-      return NextResponse.json(
-        { error: 'Jogo, dados, valor e método de pagamento são obrigatórios' },
-        { status: 400 }
-      );
-    }
+    const validatedParticipacao = participacaoSchema.parse(body);
+    const {
+      jogoId,
+      dadosParticipacao,
+      valorPago,
+      metodoPagamento,
+      telefoneMbway,
+      adminParaCliente,
+      nomeCliente,
+      telefoneCliente,
+      emailCliente
+    } = validatedParticipacao;
 
     if (metodoPagamento === 'mbway' && !telefoneMbway) {
       return NextResponse.json(
@@ -486,6 +494,9 @@ export async function POST(request: Request) {
         : 'Participação registada! Dirija-se à organização para efetuar o pagamento.'
     }, { status: 201 });
   } catch (error: any) {
+    if (error instanceof ZodError) {
+      return NextResponse.json({ error: error.errors[0].message }, { status: 400 });
+    }
     if (error.code === 'P2002') {
       return NextResponse.json(
         { error: 'Esta participação já foi comprada' },

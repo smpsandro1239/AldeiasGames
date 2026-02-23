@@ -1,11 +1,11 @@
 'use client';
 import React from 'react';
-import { ModalProps } from '@/types/project';
+import { ModalProps, Participacao } from '@/types/project';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScratchCard } from '@/components/scratch-card';
 
 interface RaspadinhaModalProps extends ModalProps {
-  participacao: any;
+  participacao: Participacao | null;
   onRevelar: (id: string) => Promise<any>;
 }
 
@@ -21,12 +21,14 @@ export function RaspadinhaModal({ isOpen, onClose, participacao, onRevelar }: Ra
 
         <div className="flex flex-col items-center justify-center py-8">
           <ScratchCard
-            id={participacao.id}
-            isRevealed={participacao.revelada}
-            onComplete={() => onRevelar(participacao.id)}
-            result={participacao.resultadoRaspe}
+            participacaoId={participacao.id}
+            numeroCartao={participacao.numeroCartao || 0}
+            isRevelada={participacao.revelada}
+            isRevelando={false}
+            resultado={participacao.dadosParticipacao} // Using dadosParticipacao as fallback
+            onReveal={onRevelar}
           />
-          <p className="mt-4 text-sm text-muted-foreground">Arraste para raspar e revelar o prémio!</p>
+          <p className="mt-4 text-sm text-muted-foreground font-medium animate-pulse">Arraste para raspar e revelar o prémio!</p>
         </div>
       </DialogContent>
     </Dialog>

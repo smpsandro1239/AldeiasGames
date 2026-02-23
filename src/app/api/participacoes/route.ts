@@ -274,7 +274,7 @@ export async function POST(request: Request) {
         await db.$executeRaw`
           INSERT INTO participacoes (
             id, jogoId, userId, valorPago, dadosParticipacao, metodoPagamento, 
-            referencia, estadoPagamento, telefoneMbway, adminRegistouId, 
+            referencia, estado, telefoneMbway, adminRegistouId,
             nomeCliente, telefoneCliente, emailCliente, numeroCartao,
             seedRaspe, hashRaspe, resultadoRaspe, revelado, createdAt, updatedAt
           )
@@ -376,7 +376,7 @@ export async function POST(request: Request) {
         metodoPagamento,
         telefoneMbway: telefoneMbway || null,
         referencia,
-        estadoPagamento: metodoPagamento === 'dinheiro' ? 'pendente' : 'pendente',
+        estado: metodoPagamento === 'dinheiro' ? 'pendente' : 'pendente',
       },
       include: {
         jogo: {
@@ -427,7 +427,7 @@ export async function POST(request: Request) {
         evento: jogo.evento?.nome || 'Evento',
         referencia,
         metodoPagamento,
-        estadoPagamento: 'pendente'
+        estado: 'pendente'
       });
 
       // Simular envio de email (em produção, usar SendGrid, Resend, etc.)

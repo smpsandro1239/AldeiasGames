@@ -2,7 +2,14 @@ import { db } from './db';
 import bcrypt from 'bcryptjs';
 import { SignJWT, jwtVerify } from 'jose';
 
-const SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'aldeias-games-secret-key-2024');
+// Chave secreta para JWT
+const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!JWT_SECRET && process.env.NODE_ENV === 'production') {
+  throw new Error('JWT_SECRET environment variable is required in production');
+}
+
+const SECRET = new TextEncoder().encode(JWT_SECRET || 'dev-secret-key-insecure-only-for-local-development');
 
 export interface UserPayload {
   id: string;

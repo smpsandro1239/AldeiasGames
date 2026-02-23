@@ -348,62 +348,16 @@ export async function POST(request: Request) {
       );
     }
 
-    // Verificar duplicados - comparação robusta campo a campo
-    // Para Rifa/Tombola: comparar numero
-    // Para Poio da Vaca: comparar letra + numero
-    let existente;
-    
-    if (dadosParticipacao.letra !== undefined) {
-      // Poio da Vaca - verificar letra e numero
-      const dadosStr = JSON.stringify(dadosParticipacao);
-      existente = await db.participacao.findFirst({
-        where: {
-          jogoId,
-          dadosParticipacao: dadosStr
-        }
-      });
-      
-      // Se não encontrou com stringify exato, tentar buscar todos e comparar
-      if (!existente) {
-        const todasParticipacoes = await db.participacao.findMany({
-          where: { jogoId }
-        });
-        
-        existente = todasParticipacoes.find(p => {
-          try {
-            const dados = JSON.parse(p.dadosParticipacao);
-            return dados.letra === dadosParticipacao.letra && dados.numero === dadosParticipacao.numero;
-          } catch {
-            return false;
-          }
-        });
+    // Verificar duplicados
+    // Usamos uma abordagem determinística para o stringify e confiamos no findFirst.
+    // O fallback de carregar tudo em memória foi removido por performance.
+    const dadosStr = JSON.stringify(dadosParticipacao);
+    let existente = await db.participacao.findFirst({
+      where: {
+        jogoId,
+        dadosParticipacao: dadosStr
       }
-    } else {
-      // Rifa/Tombola - verificar numero
-      const dadosStr = JSON.stringify(dadosParticipacao);
-      existente = await db.participacao.findFirst({
-        where: {
-          jogoId,
-          dadosParticipacao: dadosStr
-        }
-      });
-      
-      // Se não encontrou com stringify exato, tentar buscar todos e comparar
-      if (!existente) {
-        const todasParticipacoes = await db.participacao.findMany({
-          where: { jogoId }
-        });
-        
-        existente = todasParticipacoes.find(p => {
-          try {
-            const dados = JSON.parse(p.dadosParticipacao);
-            return dados.numero === dadosParticipacao.numero;
-          } catch {
-            return false;
-          }
-        });
-      }
-    }
+    });
 
     if (existente) {
       return NextResponse.json(

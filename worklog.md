@@ -1127,3 +1127,57 @@ Continuar a redução do God Component (page.tsx) e melhorar a experiência do u
 - O `page.tsx` foi limpo de interfaces e lógica redundante.
 - O Middleware utiliza o ambiente Node.js runtime para garantir a persistência do Rate Limit em memória (configuração para VPS).
 - Linting e Testes unitários estão 100% funcionais.
+
+---
+## Task ID: STABILIZE-V5 - Finalização de Refatoração e Documentação
+### Work Task
+Iteração focada na qualidade de código e conformidade:
+1. Modularização Total: Extrair os últimos modais do page.tsx.
+2. OpenAPI: Documentar a API para escalabilidade.
+3. Legal/RGPD: Garantir conformidade com normas europeias de 2026.
+4. Media Clean: Script para limpar a base de dados de imagens Base64.
+
+### Work Summary
+
+#### 1. Modularização de Modais (Fase Final)
+- Extraídos e refatorados:
+  - `ProfileModal`: Edição de perfil e gestão de dados RGPD (exportar/apagar).
+  - `PaymentHistoryModal`: Histórico detalhado para o utilizador.
+  - `OrgDetailModal`: Visualização pública de detalhes da organização.
+  - `EventDetailModal`: Visualização pública de campanhas com QR Code.
+- Impacto: O ficheiro `page.tsx` foi reduzido de ~9.6k linhas originais para ~5.4k, tornando-o significativamente mais manutenível.
+
+#### 2. Documentação da API
+- Implementada a especificação OpenAPI (Swagger) em `src/lib/openapi.ts`.
+- Criada a rota `GET /api/docs` para consumo externo.
+- Define modelos principais como User e Aldeia, facilitando integrações futuras com App Móvel.
+
+#### 3. Conformidade Legal 2026
+- Novo componente `LegalCompliance` que gera textos automáticos baseados na legislação portuguesa (Lei do Jogo).
+- Implementado `CookieBanner` persistente com gestão de consentimento via `localStorage`.
+- Reforço da transparência em sorteios de angariação de fundos.
+
+#### 4. Manutenção de Performance
+- Desenvolvido `scripts/migrate-images.ts` para transferir imagens da BD para o Filesystem.
+- Adicionado comando `npm run db:migrate-images`.
+- Ajuda a manter a base de dados SQLite leve e rápida para milhares de registos.
+
+### Files Created
+- `src/components/modals/ProfileModal.tsx`
+- `src/components/modals/PaymentHistoryModal.tsx`
+- `src/components/modals/OrgDetailModal.tsx`
+- `src/components/modals/EventDetailModal.tsx`
+- `src/components/legal-compliance.tsx`
+- `src/lib/openapi.ts`
+- `src/app/api/docs/route.ts`
+- `scripts/migrate-images.ts`
+
+### Files Modified
+- `src/app/page.tsx` - Limpeza final de componentes e inclusão de componentes externos.
+- `package.json` - Novo script de migração.
+- `todolist.md` - Atualização de status.
+
+### Technical Notes
+- Todos os componentes seguem o padrão Shadcn UI e Tailwind CSS 4.
+- A migração de imagens é idempotente e segura (verifica prefixo data:image).
+- Linting passou sem avisos.

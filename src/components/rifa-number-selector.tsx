@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Hash } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Jogo, Participacao } from '@/types/project';
+import type { Jogo, Participacao } from '@/types/project';
 
 export function RifaNumberSelector({
   jogo,

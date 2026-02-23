@@ -78,7 +78,8 @@ model Evento {
   dataInicio  DateTime
   dataFim     DateTime?
   estado      String    @default("agendado")
-  imagemBase64 String?  // Imagem em base64 para não requerer Cloudinary
+  imagemBase64 String?
+  imageUrl     String?   // Imagem em base64 para não requerer Cloudinary
   
   // === Expansão v3.0: Campanhas ===
   objectivoAngariacao Float?  // Meta de angariação

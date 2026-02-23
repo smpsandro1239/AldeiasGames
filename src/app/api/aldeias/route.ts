@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
+import { saveBase64Image } from '@/lib/storage';
+import { aldeiaSchema } from '@/lib/validations';
+import { ZodError } from 'zod';
 
 export async function GET(request: Request) {
   try {
@@ -44,66 +47,33 @@ export async function GET(request: Request) {
     return NextResponse.json(aldeias);
   } catch (error) {
     console.error('Erro ao buscar aldeias:', error);
-    return NextResponse.json(
-      { error: 'Erro ao buscar aldeias' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Erro ao buscar aldeias' }, { status: 500 });
   }
 }
 
 export async function POST(request: Request) {
   try {
     const user = await getUserFromRequest(request);
-    
     if (!user || user.role !== 'super_admin') {
-      return NextResponse.json(
-        { error: 'Não autorizado' },
-        { status: 403 }
-      );
+      return NextResponse.json({ error: 'Não autorizado' }, { status: 403 });
     }
 
     const body = await request.json();
+    const validatedData = aldeiaSchema.parse(body);
+
     const { 
       nome, 
-      descricao, 
-      localizacao, 
-      logoUrl, 
       logoBase64,
-      // === Expansão v3.0: Novos campos ===
-      tipoOrganizacao = 'aldeia',
       slug,
-      nomeEscola,
-      codigoEscola,
-      nivelEnsino,
-      responsavel,
-      contactoResponsavel,
-      morada,
-      codigoPostal,
-      localidade,
-      autorizacaoCM = false,
-      numeroAlvara
-    } = body;
+      tipoOrganizacao,
+      // ... rest of fields
+    } = validatedData;
 
-    if (!nome) {
-      return NextResponse.json(
-        { error: 'Nome é obrigatório' },
-        { status: 400 }
-      );
-    }
-
-    // Validar campos específicos para escolas
-    if (tipoOrganizacao === 'escola' && !nomeEscola) {
-      return NextResponse.json(
-        { error: 'Nome da escola é obrigatório para escolas' },
-        { status: 400 }
-      );
-    }
-
-    // Gerar slug automaticamente se não fornecido
+    // Gerar slug se não fornecido
     const generatedSlug = slug || nome
       .toLowerCase()
       .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+      .replace(/[\u0300-\u036f]/g, '')
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '');
 
@@ -113,41 +83,31 @@ export async function POST(request: Request) {
     });
 
     if (existingSlug) {
-      return NextResponse.json(
-        { error: 'Já existe uma organização com este nome/slug' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Já existe uma organização com este nome/slug' }, { status: 400 });
+    }
+
+    // Processar imagem se existir
+    let finalLogoUrl = body.logoUrl || null;
+    if (logoBase64) {
+      finalLogoUrl = await saveBase64Image(logoBase64);
     }
 
     const aldeia = await db.aldeia.create({
       data: {
-        nome,
-        descricao,
-        localizacao,
-        logoUrl,
-        logoBase64,
-        // Novos campos
-        tipoOrganizacao,
+        ...validatedData,
         slug: generatedSlug,
-        nomeEscola,
-        codigoEscola,
-        nivelEnsino,
-        responsavel,
-        contactoResponsavel,
-        morada,
-        codigoPostal,
-        localidade,
-        autorizacaoCM,
-        numeroAlvara,
+        logoUrl: finalLogoUrl,
+        // Mantemos logoBase64 vazio ou opcional para não encher a DB
+        logoBase64: null
       }
     });
 
     return NextResponse.json(aldeia, { status: 201 });
   } catch (error) {
+    if (error instanceof ZodError) {
+      return NextResponse.json({ error: error.errors[0].message }, { status: 400 });
+    }
     console.error('Erro ao criar organização:', error);
-    return NextResponse.json(
-      { error: 'Erro ao criar organização' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Erro ao criar organização' }, { status: 500 });
   }
 }

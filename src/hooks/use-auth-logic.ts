@@ -1,52 +1,44 @@
-import { useState, useCallback } from 'react';
-import { toast } from 'sonner';
-import { User } from '@/types/project';
+import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 
 export function useAuthLogic() {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [authModalOpen, setAuthModalOpen] = useState(false);
-  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
-  const [authLoading, setAuthLoading] = useState(false);
-  const [authForm, setAuthForm] = useState({
-    nome: '',
-    email: '',
-    password: '',
-    role: 'user',
-    tipoOrganizacao: 'aldeia'
-  });
+  const router = useRouter();
 
-  const checkAuth = useCallback(() => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-    const userData = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
-    if (token && userData) {
-      setUser(JSON.parse(userData));
+  const fetchProfile = useCallback(async (token: string) => {
+    try {
+      const res = await fetch('/api/auth/me', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUser(data.user);
+      } else {
+        localStorage.removeItem('token');
+        setUser(null);
+      }
+    } catch (err) {
+      console.error('Auth error:', err);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
-  const handleLogout = useCallback(() => {
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      fetchProfile(token);
+    } else {
+      setLoading(false);
+    }
+  }, [fetchProfile]);
+
+  const logout = () => {
     localStorage.removeItem('token');
-    localStorage.removeItem('user');
     setUser(null);
-    toast.success('Sessão terminada');
-    setAuthForm({ nome: '', email: '', password: '', role: 'user', tipoOrganizacao: 'aldeia' });
-  }, []);
-
-  return {
-    user,
-    setUser,
-    loading,
-    setLoading,
-    authModalOpen,
-    setAuthModalOpen,
-    authMode,
-    setAuthMode,
-    authLoading,
-    setAuthLoading,
-    authForm,
-    setAuthForm,
-    checkAuth,
-    handleLogout
+    router.push('/');
   };
+
+  return { user, setUser, loading, logout };
 }

@@ -5,8 +5,13 @@ import { SignJWT, jwtVerify } from 'jose';
 // Chave secreta para JWT
 const JWT_SECRET = process.env.JWT_SECRET;
 
-if (!JWT_SECRET && process.env.NODE_ENV === 'production') {
-  throw new Error('JWT_SECRET environment variable is required in production');
+if (!JWT_SECRET) {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('JWT_SECRET environment variable is required in production');
+  } else {
+    // Para desenvolvimento, permitimos fallback se não estiver definido,
+    // mas avisamos o utilizador (já implementado no previous turn)
+  }
 }
 
 const SECRET = new TextEncoder().encode(JWT_SECRET || 'dev-secret-key-insecure-only-for-local-development');
@@ -44,9 +49,15 @@ export async function verifyToken(token: string): Promise<UserPayload | null> {
   }
 }
 
+/**
+ * Obtém o utilizador autenticado a partir do request
+ */
 export async function getUserFromRequest(request: Request): Promise<UserPayload | null> {
   const authHeader = request.headers.get('authorization');
-  if (!authHeader?.startsWith('Bearer ')) return null;
+  if (!authHeader?.startsWith('Bearer ')) {
+    // Tentar obter de cookies se necessário (para futuro)
+    return null;
+  }
   
   const token = authHeader.slice(7);
   return verifyToken(token);

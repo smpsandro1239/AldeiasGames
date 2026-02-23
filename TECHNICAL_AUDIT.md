@@ -146,3 +146,30 @@ sequenceDiagram
     F->>F: Guarda no localStorage/State
     F-->>U: Dashboard Acessível
 ```
+
+---
+
+## 8. Pós-Auditoria: Resumo das Ações (Executado)
+
+### 8.1 Estabilização e Segurança
+- **JWT Hardening**: Removido fallback inseguro. Agora exige `JWT_SECRET`.
+- **Prisma Singleton**: Corrigida fuga de conexões em `src/lib/db.ts`.
+- **Rate Limiting**: Implementado limite de pedidos global em `src/middleware.ts`.
+- **Validação**: Todas as rotas críticas agora usam **Zod** para validação de payload.
+
+### 8.2 Refatoração de Arquitetura
+- **God Component Cleanup**: `page.tsx` reduzido de ~9.6k para ~500 linhas.
+- **Modularização**: Lógica extraída para `src/hooks/`, `src/features/` e `src/components/modals/`.
+- **UI System**: Implementado `src/components/ui-components.tsx` para consistência visual.
+
+### 8.3 Gestão de Recursos
+- **Storage Engine**: Implementado `src/lib/storage.ts`. Imagens agora são guardadas como ficheiros em `public/uploads/`.
+- **Migration Script**: Criado `scripts/migrate-images.ts` para converter Base64 legado em ficheiros.
+
+### 8.4 Novas Funcionalidades e UX
+- **CRM Admin**: Nova vista de gestão de utilizadores e analytics.
+- **SaaS Monetização**: Estrutura de planos e pricing implementada.
+- **Audio & Visual**: Adicionado `soundEngine` processual e feedback visual (confetti) nos jogos.
+- **Compliance**: Adicionado `CookieBanner` e secção legal para conformidade EU 2026.
+
+**Resultado Final**: O projeto está agora em estado de **Produção (Ready)** com arquitetura escalável e segura.

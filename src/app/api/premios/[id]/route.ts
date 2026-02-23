@@ -1,21 +1,21 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import jwt from 'jsonwebtoken';
+import { getUserFromRequest } from '@/lib/auth';
+import { saveBase64Image, deleteImage } from '@/lib/storage';
 
 // GET - Ver prémio específico
 export async function GET(
-  request: NextRequest,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
-    const token = request.headers.get('Authorization')?.replace('Bearer ', '');
-    if (!token) {
-      return NextResponse.json({ error: 'Token não fornecido' }, { status: 401 });
+    const user = await getUserFromRequest(request);
+
+    if (!user) {
+      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'aldeias-secret-key-2024') as any;
-    
     const premio = await db.premio.findUnique({
       where: { id },
       include: {
@@ -32,7 +32,7 @@ export async function GET(
     }
 
     // Verificar permissão
-    if (decoded.role !== 'super_admin' && decoded.aldeiaId !== premio.aldeiaId) {
+    if (user.role !== 'super_admin' && user.aldeiaId !== premio.aldeiaId) {
       return NextResponse.json({ error: 'Sem permissão' }, { status: 403 });
     }
 
@@ -45,19 +45,14 @@ export async function GET(
 
 // PATCH - Atualizar prémio
 export async function PATCH(
-  request: NextRequest,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
-    const token = request.headers.get('Authorization')?.replace('Bearer ', '');
-    if (!token) {
-      return NextResponse.json({ error: 'Token não fornecido' }, { status: 401 });
-    }
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'aldeias-secret-key-2024') as any;
+    const user = await getUserFromRequest(request);
     
-    if (!['super_admin', 'aldeia_admin'].includes(decoded.role)) {
+    if (!user || !['super_admin', 'aldeia_admin'].includes(user.role)) {
       return NextResponse.json({ error: 'Sem permissão' }, { status: 403 });
     }
 
@@ -67,12 +62,19 @@ export async function PATCH(
     }
 
     // Verificar permissão
-    if (decoded.role !== 'super_admin' && decoded.aldeiaId !== premio.aldeiaId) {
+    if (user.role !== 'super_admin' && user.aldeiaId !== premio.aldeiaId) {
       return NextResponse.json({ error: 'Sem permissão' }, { status: 403 });
     }
 
     const body = await request.json();
     const { nome, descricao, valorEstimado, imagemBase64, patrocinador, ordem, ativo } = body;
+
+    let finalImageUrl = premio.imageUrl;
+    if (imagemBase64) {
+      // Remover imagem antiga se existir
+      if (premio.imageUrl) deleteImage(premio.imageUrl);
+      finalImageUrl = await saveBase64Image(imagemBase64);
+    }
 
     const updatedPremio = await db.premio.update({
       where: { id },
@@ -80,7 +82,8 @@ export async function PATCH(
         nome: nome?.trim(),
         descricao: descricao?.trim() || null,
         valorEstimado: valorEstimado ? parseFloat(valorEstimado) : null,
-        imagemBase64: imagemBase64,
+        imageUrl: finalImageUrl,
+        imagemBase64: null, // Limpar base64 antigo
         patrocinador: patrocinador?.trim() || null,
         ordem: ordem ? parseInt(ordem) : premio.ordem,
         ativo: ativo !== undefined ? ativo : premio.ativo
@@ -99,19 +102,14 @@ export async function PATCH(
 
 // DELETE - Apagar prémio (soft delete)
 export async function DELETE(
-  request: NextRequest,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
-    const token = request.headers.get('Authorization')?.replace('Bearer ', '');
-    if (!token) {
-      return NextResponse.json({ error: 'Token não fornecido' }, { status: 401 });
-    }
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'aldeias-secret-key-2024') as any;
+    const user = await getUserFromRequest(request);
     
-    if (!['super_admin', 'aldeia_admin'].includes(decoded.role)) {
+    if (!user || !['super_admin', 'aldeia_admin'].includes(user.role)) {
       return NextResponse.json({ error: 'Sem permissão' }, { status: 403 });
     }
 
@@ -125,7 +123,7 @@ export async function DELETE(
     }
 
     // Verificar permissão
-    if (decoded.role !== 'super_admin' && decoded.aldeiaId !== premio.aldeiaId) {
+    if (user.role !== 'super_admin' && user.aldeiaId !== premio.aldeiaId) {
       return NextResponse.json({ error: 'Sem permissão' }, { status: 403 });
     }
 
@@ -143,6 +141,7 @@ export async function DELETE(
     }
 
     // Hard delete se não estiver associado
+    if (premio.imageUrl) deleteImage(premio.imageUrl);
     await db.premio.delete({ where: { id } });
     return NextResponse.json({ message: 'Prémio apagado com sucesso' });
   } catch (error) {

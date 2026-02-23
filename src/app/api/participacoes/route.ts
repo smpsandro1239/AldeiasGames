@@ -336,18 +336,7 @@ export async function POST(request: Request) {
     }
 
     // === OUTROS JOGOS ===
-    const validatedParticipacao = participacaoSchema.parse(body);
-    const {
-      jogoId,
-      dadosParticipacao,
-      valorPago,
-      metodoPagamento,
-      telefoneMbway,
-      adminParaCliente,
-      nomeCliente,
-      telefoneCliente,
-      emailCliente
-    } = validatedParticipacao;
+    participacaoSchema.parse(body);
 
     if (metodoPagamento === 'mbway' && !telefoneMbway) {
       return NextResponse.json(

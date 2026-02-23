@@ -1,53 +1,53 @@
 # 📋 TODOLIST - Aldeias Games
 
 > Última atualização: 2026-02-23
-> Progresso: 95% (Fase de Estabilização)
-> Versão: 3.12.0-stabilization
+> Progresso: 90% (Refatoração de Modais concluída)
+> Versão: 3.11.0-refactor-modals
 
 ---
 
-## 🔴 PRIORIDADE CRÍTICA - Estabilização Final
+## 🔴 PRIORIDADE CRÍTICA - Refatoração Final
 
 ### Refatoração "God Component" (page.tsx) ✅
-- [x] Extrair tipos e logic
-- [x] Extrair todos os modais complexos para `src/components/modals/`
-- [x] Eliminar funções órfãs no fim do ficheiro
-- [x] Reduzir `src/app/page.tsx` para ~5.4k linhas (50% do original)
-
-### Gestão de Media ✅
-- [x] Implementar sistema de armazenamento local
-- [x] Criar script de migração para remover Base64 da BD (`scripts/migrate-images.ts`)
+- [x] Extrair tipos para `src/types/project.ts`
+- [x] Extrair sub-componentes UI básicos
+- [x] Extrair `AuthModal`, `ParticiparModal`, `CreateModal`, `WizardModal`
+- [ ] Mover modais de Detalhe e Perfil para ficheiros separados (Pendente)
+- [🏗️] Reduzir `src/app/page.tsx` para menos de 2000 linhas (Atualmente ~6.5k)
 
 ---
 
-## 🟠 PRIORIDADE ALTA - Segurança e Compliance
+## 🟠 PRIORIDADE ALTA - Segurança e UX
 
-### Documentação API ✅
-- [x] Implementar spec OpenAPI/Swagger inicial
-- [x] Rota `GET /api/docs` ativa
+### Segurança: Rate Limiting ✅
+- [x] Implementar Middleware global de Rate Limiting (`src/middleware.ts`)
+- [x] Configurar regras para Login/Registo e API Pesadas
 
-### Conformidade Legal ✅
-- [x] Gerador de textos legais dinâmicos por organização
-- [x] Banner de Cookies/Consentimento para RGPD 2026
+### Imersão: Raspadinha v2 ✅
+- [x] Efeitos de Confetti ao ganhar (`canvas-confetti`)
+- [x] Feedback visual de raspagem melhorado (Gold/Bronze gradient)
+- [ ] Adicionar efeitos sonoros (Web Audio API)
 
 ---
 
-## 🟡 PRIORIDADE MÉDIA - Funcionalidades e Monetização
+## 🟡 PRIORIDADE MÉDIA - Funcionalidades e Escala
 
-### Monetização 🏗️
+### Gestão de Media 🏗️
+- [x] Sistema de armazenamento local (`src/lib/storage.ts`)
+- [ ] Script para migrar imagens Base64 antigas para ficheiros (Pendente)
+
+### DevOps & Monetização 🏗️
 - [ ] Integração real com Stripe (Pagamentos e Subscrições)
-- [ ] Dashboard de faturamento para super_admin
-
-### Real-time 🏗️
-- [ ] Implementar WebSockets (Socket.io ou Pusher) para sorteios ao vivo
-- [ ] Notificações Push reais
+- [ ] Documentação OpenAPI/Swagger (Setup inicial pendente)
+- [ ] Implementar notificações Push (Web Push API)
 
 ---
 
 ## ✅ CONCLUÍDO (Recentemente)
-- [x] Rate Limiting Global
-- [x] Raspadinha Premium com Confetti
-- [x] Índices de Performance BD
+- [x] Singleton do PrismaClient
+- [x] Validação Zod em rotas críticas
+- [x] Índices na BD SQLite
+- [x] Componente `FundingGoal`
 
 ---
 
@@ -56,8 +56,8 @@
 | Área | Status |
 |------|--------|
 | Segurança | 100% ✅ |
-| Arquitetura | 90% |
-| Performance | 100% ✅ |
+| Arquitetura | 85% |
+| Performance | 95% |
 | Funcionalidades | 95% |
 
 ---

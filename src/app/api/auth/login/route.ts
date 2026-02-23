@@ -1,18 +1,16 @@
 import { NextResponse } from 'next/server';
 import { loginUser, createToken } from '@/lib/auth';
 import { db } from '@/lib/db';
+import { loginSchema } from '@/lib/validations';
+import { ZodError } from 'zod';
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { email, password } = body;
 
-    if (!email || !password) {
-      return NextResponse.json(
-        { error: 'Email e password são obrigatórios' },
-        { status: 400 }
-      );
-    }
+    // Validar com Zod
+    const validatedData = loginSchema.parse(body);
+    const { email, password } = validatedData;
 
     const user = await loginUser(email, password);
     
@@ -30,7 +28,7 @@ export async function POST(request: Request) {
         data: { ultimoLogin: new Date() }
       });
     } catch (e) {
-      // Ignorar erro se campo não existir
+      // Ignorar erro
     }
 
     const token = await createToken({
@@ -53,6 +51,12 @@ export async function POST(request: Request) {
       token,
     });
   } catch (error) {
+    if (error instanceof ZodError) {
+      return NextResponse.json(
+        { error: error.errors[0].message },
+        { status: 400 }
+      );
+    }
     console.error('Erro ao fazer login:', error);
     return NextResponse.json(
       { error: 'Erro interno do servidor' },

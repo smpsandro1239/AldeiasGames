@@ -90,6 +90,7 @@ model Evento {
   aldeia      Aldeia    @relation(fields: [aldeiaId], references: [id])
   jogos       Jogo[]
 
+    @@index([aldeiaId])
   @@map("eventos")
 }
 
@@ -120,6 +121,7 @@ model Jogo {
   sorteio           Sorteio?
   premio            Premio?        @relation(fields: [premioId], references: [id])
 
+    @@index([eventoId])
   @@map("jogos")
 }
 
@@ -156,6 +158,8 @@ model Participacao {
   jogo              Jogo                    @relation(fields: [jogoId], references: [id])
 
   @@unique([jogoId, dadosParticipacao])
+    @@index([userId])
+  @@index([referencia])
   @@map("participacoes")
 }
 
@@ -265,6 +269,7 @@ model LogAcesso {
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id])
 
+    @@index([userId])
   @@map("logs_acesso")
 }
 
@@ -301,5 +306,6 @@ model Notificacao {
   
   user        User     @relation(fields: [userId], references: [id])
 
+    @@index([userId])
   @@map("notificacoes")
 }

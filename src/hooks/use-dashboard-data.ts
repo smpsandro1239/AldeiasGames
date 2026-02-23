@@ -1,37 +1,35 @@
-import { useState, useCallback } from 'react';
-import { Jogo, Participacao, Aldeia, Evento } from '@/types/project';
+import { useState, useEffect, useCallback } from 'react';
+import { User, DashboardStats } from '@/types/project';
 
-export function useDashboardData() {
-  const [jogosPublicos, setJogosPublicos] = useState<Jogo[]>([]);
-  const [minhasParticipacoes, setMinhasParticipacoes] = useState<Participacao[]>([]);
-  const [aldeias, setAldeias] = useState<Aldeia[]>([]);
-  const [eventos, setEventos] = useState<Evento[]>([]);
-  const [jogosAdmin, setJogosAdmin] = useState<Jogo[]>([]);
-  const [vendasVendedor, setVendasVendedor] = useState<Participacao[]>([]);
+export function useDashboardData(user: User | null) {
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [globalActivity, setGlobalActivity] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  const fetchPublicGames = useCallback(async () => {
+  const fetchData = useCallback(async () => {
+    if (!user) return;
+    setLoading(true);
+    const token = localStorage.getItem('token');
+
     try {
-      const res = await fetch('/api/jogos');
-      const data = await res.json();
-      setJogosPublicos(Array.isArray(data) ? data.filter((j: Jogo) => j.estado === 'ativo' || j.estado === 'terminado') : []);
+      const res = await fetch('/api/stats/dashboard', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setStats(data.stats);
+        setGlobalActivity(data.activity || []);
+      }
     } catch (error) {
-      console.error('Error fetching games:', error);
+      console.error('Stats error:', error);
+    } finally {
+      setLoading(false);
     }
-  }, []);
+  }, [user]);
 
-  return {
-    jogosPublicos,
-    setJogosPublicos,
-    minhasParticipacoes,
-    setMinhasParticipacoes,
-    aldeias,
-    setAldeias,
-    eventos,
-    setEventos,
-    jogosAdmin,
-    setJogosAdmin,
-    vendasVendedor,
-    setVendasVendedor,
-    fetchPublicGames
-  };
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  return { stats, globalActivity, loading, refresh: fetchData };
 }

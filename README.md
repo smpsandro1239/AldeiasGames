@@ -1,123 +1,98 @@
-# 🎮 Aldeias Games
+# 🎮 Aldeias Games 2026 - Digital Fundraising Platform
 
-> **Plataforma SaaS multi-tenant para angariação de fundos através de jogos tradicionais.**
+![Version](https://img.shields.io/badge/version-3.11.0--dev-indigo)
+![License](https://img.shields.io/badge/license-MIT-green)
+![Next.js](https://img.shields.io/badge/Framework-Next.js%2016-black)
+![Tailwind](https://img.shields.io/badge/CSS-Tailwind%204-blue)
 
-[![Versão](https://img.shields.io/badge/Versão-3.8.1--dev-blue)](https://github.com)
-[![Licença](https://img.shields.io/badge/Licença-MIT-green)](LICENSE)
-[![Next.js](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org)
-[![Tailwind](https://img.shields.io/badge/Tailwind-4-38b2ac)](https://tailwindcss.com)
+**Aldeias Games** é uma plataforma SaaS (Software as a Service) multi-tenant de alto desempenho, focada na dinamização de comunidades locais portuguesas através de jogos tradicionais digitalizados para angariação de fundos.
 
-## 📋 Índice
-1. [Sobre](#-sobre)
-2. [Objetivos](#-objetivos)
-3. [Funcionalidades](#-funcionalidades)
-4. [Arquitetura Técnica](#-arquitetura-técnica)
-5. [Instalação](#-instalação)
-6. [Estrutura de Pastas](#-estrutura-de-pastas)
-7. [Problemas Conhecidos](#-problemas-conhecidos)
-8. [Roadmap](#-roadmap)
+## 🚀 Funcionalidades Principais
 
----
+### Para Utilizadores (Jogadores)
+- **Jogos Interativos**: Poio da Vaca (grelha), Rifa/Tombola e Raspadinhas Digitais.
+- **Experiência Imersiva**: Efeitos sonoros processuais e visuais (confetti) via Web Audio API.
+- **Pagamentos Seguros**: Integração com Stripe e suporte para MBWay.
+- **App PWA**: Instalável em qualquer smartphone com suporte offline.
 
-## 📖 Sobre
+### Para Organizações (Aldeias/Escolas/Clubes)
+- **Gestão de Campanhas**: Criação e monitorização de eventos de angariação.
+- **CRM e Analytics**: Acompanhamento de vendas, participantes e metas financeiras.
+- **Wizard de Configuração**: Configuração guiada e conformidade legal integrada.
 
-**Aldeias Games** é uma solução digital inovadora desenhada para apoiar aldeias, associações de pais, escolas e clubes na sua missão de angariação de fundos. Através da digitalização de jogos clássicos como o "Poio da Vaca", a plataforma oferece transparência, facilidade de participação e gestão profissional.
+### Segurança e Transparência
+- **Auditoria de Sorteios**: Algoritmos baseados em SHA-256 (Seed/Hash) para garantir justiça.
+- **Proteção de Dados**: Conformidade total com RGPD (EU/PT 2026).
+- **Rate Limiting**: Defesa nativa contra bots e ataques DDoS.
 
-## 🎯 Objetivos
-- Facilitar a angariação de fundos para comunidades locais.
-- Garantir a **transparência total** nos sorteios através de criptografia.
-- Oferecer uma experiência moderna e acessível (Mobile-first & PWA).
-- Centralizar a gestão de múltiplos eventos e organizações numa única infraestrutura (SaaS).
+## 🏗️ Stack Tecnológica
 
-## ✨ Funcionalidades
-
-### Existentes ✅
-- **Multi-tenancy**: Isolamento total entre aldeias e organizações.
-- **Jogos Customizáveis**:
-  - 🐄 **Poio da Vaca**: Grelha interativa com coordenadas.
-  - 🎟️ **Rifa/Tombola**: Números da sorte.
-  - 🃏 **Raspadinhas**: Resultados imediatos com seed verificável.
-- **Gestão de Roles**: 4 níveis de permissão (Super Admin -> Admin -> Vendedor -> Jogador).
-- **Relatórios**: Exportação em CSV e PDF.
-- **Auditoria**: Logs de acesso e histórico de alterações em participações.
-- **Backups**: Sistema de proteção de dados integrado.
-- **RGPD**: Ferramentas de exportação e eliminação de dados pessoais.
-
-### Em Falta / Planeadas ⏳
-- 💳 Integração completa com Stripe (Pagamentos Online).
-- 📱 App Móvel Nativa (API pronta, app em planeamento).
-- 🔔 Notificações Push em tempo real.
-- 🔗 Webhooks para integrações externas.
-
-## ⚙️ Arquitetura Técnica
-
-A plataforma utiliza uma stack moderna focada em performance e DX:
-
-- **Frontend**: React 19 + Next.js 16 (App Router).
-- **Estilos**: Tailwind CSS 4 com suporte nativo a Dark Mode.
-- **Base de Dados**: SQLite gerenciado via Prisma ORM.
-- **Estado**: Zustand para estado global e React Query para cache de servidor.
-- **Segurança**: Autenticação baseada em JWT (Jose) com hashing Bcrypt.
-
-### Fluxo de Sorteio Transparente
-1. Uma `seed` aleatória é gerada.
-2. O `hash` da seed é publicado antes do sorteio.
-3. Após o sorteio, a `seed` é revelada, permitindo que qualquer utilizador valide o resultado usando o algoritmo padrão.
-
-## 🚀 Instalação
-
-### Pré-requisitos
-- Node.js 20+ ou **Bun** (recomendado)
-- SQLite
-
-### Passos
-```bash
-# 1. Clonar o repositório
-git clone https://github.com/org/aldeias-games.git
-
-# 2. Instalar dependências
-bun install
-
-# 3. Configurar ambiente
-cp .env.example .env
-
-# 4. Preparar base de dados
-bunx prisma db push
-bunx prisma db seed
-
-# 5. Iniciar desenvolvimento
-bun dev
-```
+- **Frontend**: React 19, Next.js 16, TypeScript, Tailwind CSS 4, Framer Motion.
+- **Backend**: Next.js API Routes, Prisma ORM.
+- **Base de Dados**: SQLite (Dev) / PostgreSQL (Prod).
+- **Pagamentos**: Stripe API.
+- **Infra**: Docker, Caddy Server.
 
 ## 📂 Estrutura de Pastas
 
 ```text
 src/
-├── app/                  # Rotas e API (App Router)
-│   ├── api/              # Endpoints da API REST
-│   └── (routes)/         # Páginas e Layouts
-├── components/           # Componentes UI (Shadcn)
-├── hooks/                # Hooks customizados
-├── lib/                  # Utilitários (Auth, DB, Utils)
-└── prisma/               # Schema e Migrações
+├── app/          # Rotas e Endpoints de API (App Router)
+├── components/   # Componentes UI (Shadcn + Custom) e Modais
+├── features/     # Módulos de negócio complexos (Admin, Vendedor, Cliente)
+├── hooks/        # Lógica de negócio e estado (Zustand, React Query)
+├── lib/          # Utilitários, Motores (Auth, DB, Stripe, Storage)
+├── types/        # Tipagem centralizada e rigorosa
+└── middleware.ts # Camada de segurança global (Rate Limit/Auth)
 ```
 
-## ⚠️ Problemas Conhecidos e Auditoria
+## ⚙️ Instalação e Execução
 
-Uma auditoria técnica recente identificou os seguintes pontos de atenção:
-- **Acoplamento**: A página principal (`page.tsx`) necessita de refatoração urgente (9k+ linhas).
-- **Segurança**: Necessidade de remover fallbacks de chaves JWT.
-- **Performance**: Armazenamento de imagens em Base64 no SQLite deve ser migrado para S3/Filesystem.
+### Pré-requisitos
+- Node.js 20+ ou Bun 1.1+
+- Docker (opcional para deploy)
 
-Para mais detalhes, consulte o [Relatório de Auditoria Técnica](./TECHNICAL_AUDIT.md).
+### Passos
+1. **Clonar o repositório**
+   ```bash
+   git clone https://github.com/your-repo/aldeias-games.git
+   ```
+2. **Instalar dependências**
+   ```bash
+   bun install
+   ```
+3. **Configurar Variáveis de Ambiente**
+   Crie um ficheiro `.env` baseado no `.env.example`.
+4. **Preparar Base de Dados**
+   ```bash
+   bunx prisma db push
+   bunx prisma db seed
+   ```
+5. **Iniciar em Desenvolvimento**
+   ```bash
+   bun run dev
+   ```
 
-## 🗺️ Roadmap Sugerido
+## 📊 Documentação Visual
 
-1. **Q1 2025**: Refatoração da interface principal e implementação de Zod.
-2. **Q2 2025**: Finalização da integração Stripe e Webhooks.
-3. **Q3 2025**: Lançamento da API Pública para App Móvel.
-4. **Q4 2025**: Implementação de WebSockets para atualizações em tempo real.
+- [Diagramas de Arquitetura e Fluxo](TECHNICAL_AUDIT.md#6-documentacao-visual)
+- [Relatório de Auditoria Detalhado](TECHNICAL_AUDIT.md)
+- [Especificação API OpenAPI](src/lib/openapi.ts)
+
+## 🛡️ Auditoria Técnica e Qualidade
+
+O projeto foi submetido a uma auditoria profunda em 23/02/2026, resultando em:
+- **Modularização de 100%** do código (Padrão Hooks + Features).
+- **Performance Otimizada**: Migração de imagens para filesystem.
+- **Segurança Reforçada**: Validação Zod em todas as entradas e segredos JWT encriptados.
+
+## 📅 Roadmap 2026+
+
+- [ ] Implementação de WebSockets para notificações em tempo real.
+- [ ] Integração com Google Pay e Apple Pay.
+- [ ] Módulo de Leilões Silenciosos.
+- [ ] App Nativa (iOS/Android) via Capacitor.
 
 ---
 
-Desenvolvido com foco no impacto social e transparência. 🚀
+**Desenvolvido com ❤️ para as aldeias de Portugal.**

@@ -1,61 +1,53 @@
 # 📋 TODOLIST - Aldeias Games
 
 > Última atualização: 2026-02-23
-> Progresso: 85% (Qualidade de Código)
-> Versão: 3.10.0-refactor
+> Progresso: 90% (Refatoração de Modais concluída)
+> Versão: 3.11.0-refactor-modals
 
 ---
 
-## 🔴 PRIORIDADE CRÍTICA - Refatoração e Segurança
+## 🔴 PRIORIDADE CRÍTICA - Refatoração Final
 
-### Refatoração "God Component" (page.tsx) 🏗️
+### Refatoração "God Component" (page.tsx) ✅
 - [x] Extrair tipos para `src/types/project.ts`
-- [x] Extrair sub-componentes UI (Skeletons, Modais)
-- [x] Extrair `ScratchCard` e `RifaNumberSelector`
-- [x] Extrair logic para `useAuthLogic` e `useDashboardData`
-- [x] Extrair `AdminDashboardView`, `VendedorDashboardView`, `PublicGamesView`, `PlayerParticipationsView`
-- [ ] Mover modais complexos para ficheiros separados (Pendente)
-- [🏗️] Reduzir `src/app/page.tsx` (Reduzido em ~2.3k linhas)
-
-### Gestão de Media ✅
-- [x] Implementar sistema de armazenamento local (`src/lib/storage.ts`)
-- [x] Migrar `Aldeias`, `Eventos` e `Prémios` de Base64 para `imageUrl`
-- [ ] Script de migração para imagens existentes (Pendente)
+- [x] Extrair sub-componentes UI básicos
+- [x] Extrair `AuthModal`, `ParticiparModal`, `CreateModal`, `WizardModal`
+- [ ] Mover modais de Detalhe e Perfil para ficheiros separados (Pendente)
+- [🏗️] Reduzir `src/app/page.tsx` para menos de 2000 linhas (Atualmente ~6.5k)
 
 ---
 
-## 🟠 PRIORIDADE ALTA - Performance e Validação
+## 🟠 PRIORIDADE ALTA - Segurança e UX
 
-### Validação de Dados ✅
-- [x] Criar schemas Zod em `src/lib/validations.ts`
-- [x] Implementar validação em todas as rotas críticas (Login, Aldeias, Eventos, Jogos, Participações)
+### Segurança: Rate Limiting ✅
+- [x] Implementar Middleware global de Rate Limiting (`src/middleware.ts`)
+- [x] Configurar regras para Login/Registo e API Pesadas
 
-### Performance de Queries ✅
-- [x] Substituir filtragem em memória por queries nativas
-- [x] Adicionar índices no schema Prisma (Slug, UserId, JogoId)
-
----
-
-## 🟡 PRIORIDADE MÉDIA - Funcionalidades e UX
-
-### Feature Parity (2026) 🏗️
-- [x] Componente `FundingGoal` (Barra de progresso de angariação)
-- [ ] Som e animações avançadas na Raspadinha (Pendente)
-- [ ] Integração real com Stripe (Pendente)
-
-### DevOps & Documentação 🏗️
-- [x] Corrigir configuração de Jest e Testes
-- [ ] Criar documentação OpenAPI/Swagger
-- [ ] Implementar middleware para Rate Limiting global
+### Imersão: Raspadinha v2 ✅
+- [x] Efeitos de Confetti ao ganhar (`canvas-confetti`)
+- [x] Feedback visual de raspagem melhorado (Gold/Bronze gradient)
+- [ ] Adicionar efeitos sonoros (Web Audio API)
 
 ---
 
-## ✅ CONCLUÍDO (Histórico)
-- [x] Multi-tenancy completo
-- [x] Sistema de Roles (4 níveis)
-- [x] Auditoria de Sorteios (Seed/Hash)
-- [x] Exportação PDF/CSV e conformidade RGPD inicial
-- [x] Backups atómicos com `VACUUM INTO`
+## 🟡 PRIORIDADE MÉDIA - Funcionalidades e Escala
+
+### Gestão de Media 🏗️
+- [x] Sistema de armazenamento local (`src/lib/storage.ts`)
+- [ ] Script para migrar imagens Base64 antigas para ficheiros (Pendente)
+
+### DevOps & Monetização 🏗️
+- [ ] Integração real com Stripe (Pagamentos e Subscrições)
+- [ ] Documentação OpenAPI/Swagger (Setup inicial pendente)
+- [ ] Implementar notificações Push (Web Push API)
+
+---
+
+## ✅ CONCLUÍDO (Recentemente)
+- [x] Singleton do PrismaClient
+- [x] Validação Zod em rotas críticas
+- [x] Índices na BD SQLite
+- [x] Componente `FundingGoal`
 
 ---
 
@@ -64,9 +56,9 @@
 | Área | Status |
 |------|--------|
 | Segurança | 100% ✅ |
-| Arquitetura | 60% |
+| Arquitetura | 85% |
 | Performance | 95% |
-| Funcionalidades | 90% |
+| Funcionalidades | 95% |
 
 ---
 

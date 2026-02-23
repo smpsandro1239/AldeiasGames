@@ -1,5 +1,5 @@
 // Rate Limiting simples em memória
-// Para produção, usar Redis ou similar
+// Para produção escala, usar Redis ou Upstash
 
 interface RateLimitEntry {
   count: number;
@@ -8,15 +8,17 @@ interface RateLimitEntry {
 
 const rateLimits = new Map<string, RateLimitEntry>();
 
-// Limpar entradas antigas a cada minuto
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, entry] of rateLimits.entries()) {
-    if (entry.resetTime < now) {
-      rateLimits.delete(key);
+// Limpeza periódica (apenas se não estivermos no middleware do Next.js Edge)
+if (typeof window === 'undefined' && typeof process !== 'undefined' && process.env.NEXT_RUNTIME !== 'edge') {
+  setInterval(() => {
+    const now = Date.now();
+    for (const [key, entry] of rateLimits.entries()) {
+      if (entry.resetTime < now) {
+        rateLimits.delete(key);
+      }
     }
-  }
-}, 60000);
+  }, 60000);
+}
 
 export interface RateLimitConfig {
   windowMs: number;  // Janela de tempo em milissegundos
@@ -25,13 +27,13 @@ export interface RateLimitConfig {
 
 export const RATE_LIMITS: Record<string, RateLimitConfig> = {
   // Autenticação
-  'auth/login': { windowMs: 60000, maxRequests: 5 },      // 5 tentativas por minuto
-  'auth/register': { windowMs: 60000, maxRequests: 3 },    // 3 registos por minuto
-  'auth/reset': { windowMs: 60000, maxRequests: 2 },       // 2 resets por minuto
+  'auth/login': { windowMs: 60000, maxRequests: 10 },      // 10 tentativas por minuto
+  'auth/register': { windowMs: 60000, maxRequests: 5 },    // 5 registos por minuto
+  'auth/reset': { windowMs: 60000, maxRequests: 3 },       // 3 resets por minuto
   
   // API geral
-  'api/default': { windowMs: 60000, maxRequests: 100 },    // 100 requests por minuto
-  'api/heavy': { windowMs: 60000, maxRequests: 20 },       // 20 requests pesados por minuto
+  'api/default': { windowMs: 60000, maxRequests: 200 },    // 200 requests por minuto
+  'api/heavy': { windowMs: 60000, maxRequests: 50 },       // 50 requests pesados por minuto
 };
 
 export function checkRateLimit(
@@ -46,15 +48,16 @@ export function checkRateLimit(
   
   if (!entry || entry.resetTime < now) {
     // Criar nova entrada
-    rateLimits.set(key, {
+    const newEntry = {
       count: 1,
       resetTime: now + config.windowMs
-    });
+    };
+    rateLimits.set(key, newEntry);
     
     return {
       allowed: true,
       remaining: config.maxRequests - 1,
-      resetTime: now + config.windowMs
+      resetTime: newEntry.resetTime
     };
   }
   

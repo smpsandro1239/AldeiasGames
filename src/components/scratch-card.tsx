@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { useScratchSound } from "@/hooks/use-scratch-sound";
 import confetti from 'canvas-confetti';
 import { Shield, Trophy, Sparkles } from 'lucide-react';
 
@@ -21,88 +22,56 @@ export const ScratchCard: React.FC<ScratchCardProps> = ({
   resultado,
   onReveal
 }) => {
+  const { playScratching, playWin } = useScratchSound();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isScratching, setIsScratching] = useState(false);
   const [scratchProgress, setScratchProgress] = useState(0);
   const isWinner = resultado?.isWinner;
 
-  // Initialize canvas with scratch layer
+  // Initialize canvas
   useEffect(() => {
-    if (isRevelada || isRevelando) return;
-
     const canvas = canvasRef.current;
-    const container = containerRef.current;
-    if (!canvas || !container) return;
+    if (!canvas || isRevelada) return;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const rect = container.getBoundingClientRect();
-    canvas.width = rect.width;
-    canvas.height = rect.height;
-
-    // Draw scratch layer (Golden/Bronze gradient for 2026 feel)
-    const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-    gradient.addColorStop(0, '#D4AF37'); // Gold
-    gradient.addColorStop(0.3, '#F9F295'); // Light Gold
-    gradient.addColorStop(0.5, '#E6BE8A'); // Bronze
-    gradient.addColorStop(0.7, '#F9F295');
-    gradient.addColorStop(1, '#B8860B'); // Dark Gold
-
-    ctx.fillStyle = gradient;
+    // Fill with scratchable color
+    ctx.fillStyle = '#C0C0C0'; // Silver
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Add texture
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
-    for (let i = 0; i < 200; i++) {
-      ctx.fillRect(Math.random() * canvas.width, Math.random() * canvas.height, 1, 1);
-    }
-
-    // Add shine pattern
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-    ctx.lineWidth = 15;
-    ctx.beginPath();
-    ctx.moveTo(-50, 0);
-    ctx.lineTo(canvas.width, canvas.height + 50);
-    ctx.stroke();
-
-    // Add text instruction
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-    ctx.font = `bold ${Math.max(16, canvas.width / 10)}px sans-serif`;
+    // Add pattern/text to the scratch layer
+    ctx.fillStyle = '#A0A0A0';
+    ctx.font = 'bold 20px Arial';
     ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.shadowColor = 'rgba(0,0,0,0.3)';
-    ctx.shadowBlur = 4;
-    ctx.fillText('RASPE AQUI', canvas.width / 2, canvas.height / 2);
-    ctx.shadowBlur = 0;
+    for (let i = 0; i < 5; i++) {
+        for (let j = 0; j < 5; j++) {
+            ctx.fillText('ALDEIA', (canvas.width/5) * i + 40, (canvas.height/5) * j + 40);
+        }
+    }
+  }, [isRevelada]);
 
-    ctx.font = `${Math.max(10, canvas.width / 16)}px sans-serif`;
-    ctx.fillText('✨ PRÉMIO MISTÉRIO ✨', canvas.width / 2, canvas.height / 2 + 30);
-  }, [isRevelada, isRevelando]);
-
-  // Handle Winner Confetti
+  // Handle victory effects
   useEffect(() => {
     if (isRevelada && isWinner) {
+      playWin();
       const duration = 3 * 1000;
       const animationEnd = Date.now() + duration;
-      const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
+      const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 100 };
 
       const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
 
       const interval: any = setInterval(function() {
         const timeLeft = animationEnd - Date.now();
-
-        if (timeLeft <= 0) {
-          return clearInterval(interval);
-        }
+        if (timeLeft <= 0) return clearInterval(interval);
 
         const particleCount = 50 * (timeLeft / duration);
         confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } });
         confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } });
       }, 250);
     }
-  }, [isRevelada, isWinner]);
+  }, [isRevelada, isWinner, playWin]);
 
   // Handle scratch
   const handleScratch = useCallback((e: React.MouseEvent | React.TouchEvent) => {
@@ -123,6 +92,8 @@ export const ScratchCard: React.FC<ScratchCardProps> = ({
     ctx.arc(x, y, 25, 0, Math.PI * 2);
     ctx.fill();
 
+    playScratching();
+
     // Check progress
     if (Math.random() > 0.95) {
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -138,7 +109,7 @@ export const ScratchCard: React.FC<ScratchCardProps> = ({
         onReveal(participacaoId);
       }
     }
-  }, [isRevelada, isRevelando, participacaoId, onReveal]);
+  }, [isRevelada, isRevelando, participacaoId, onReveal, playScratching]);
 
   return (
     <div
@@ -202,13 +173,6 @@ export const ScratchCard: React.FC<ScratchCardProps> = ({
                 </div>
               </>
             )}
-
-            <div className="pt-4 flex justify-center gap-2">
-              <Badge variant="outline" className="bg-white/80 backdrop-blur-sm border-gray-200">
-                <Shield className="h-3 w-3 mr-1 text-blue-500" />
-                <span className="text-[10px]">Validado</span>
-              </Badge>
-            </div>
           </motion.div>
         ) : (
           <div className="space-y-3">
@@ -238,19 +202,6 @@ export const ScratchCard: React.FC<ScratchCardProps> = ({
           #{numeroCartao.toString().padStart(4, '0')}
         </div>
       </div>
-
-      {/* Interactive Sparkle on Hover */}
-      {!isRevelada && !isRevelando && (
-        <div className="absolute inset-0 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-          <div className="absolute top-1/4 left-1/4 animate-ping">✨</div>
-          <div className="absolute top-3/4 right-1/4 animate-ping delay-300">✨</div>
-        </div>
-      )}
     </div>
   );
 };
-
-// Help helper
-function Badge({ children, variant, className }: any) {
-  return <div className={cn("inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors", variant === 'outline' ? 'text-foreground border-input' : 'border-transparent bg-primary text-primary-foreground', className)}>{children}</div>;
-}

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, User, Mail, Shield, Save } from 'lucide-react';
+import { X, User, Bell, Mail, Shield, Save } from 'lucide-react';
 import { UIButton, UICard } from '@/components/ui-components';
 import { toast } from 'sonner';
 
@@ -7,9 +7,30 @@ export function ProfileModal({ isOpen, onClose, user, onUpdate }: any) {
   const [nome, setNome] = useState(user?.nome || '');
   const [email, setEmail] = useState(user?.email || '');
   const [loading, setLoading] = useState(false);
+  const [pushLoading, setPushLoading] = useState(false);
 
   if (!isOpen) return null;
 
+  const handlePush = async () => {
+    setPushLoading(true);
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission === "granted") {
+        const registration = await navigator.serviceWorker.ready;
+        const subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: "BEl62vp95WthUM94zCdfp9KBAf4pG-EOnK8rE5XbbS6p_p-xU8s7V3f8yH3v9x" // Dummy key
+        });
+        await fetch("/api/push/subscribe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("token")}` },
+          body: JSON.stringify(subscription)
+        });
+        toast.success("Notificações ativadas!");
+      }
+    } catch (e) { toast.error("Erro ao ativar notificações"); }
+    finally { setPushLoading(false); }
+  };
   const handleSave = async () => {
     setLoading(true);
     try {
@@ -69,6 +90,9 @@ export function ProfileModal({ isOpen, onClose, user, onUpdate }: any) {
           </div>
         </div>
 
+        <UIButton variant="secondary" className="w-full mt-4" onClick={handlePush} disabled={pushLoading} icon={<Bell className="w-4 h-4" />}>
+          {pushLoading ? "A configurar..." : "Ativar Notificações Push"}
+        </UIButton>
         <UIButton className="w-full mt-8" onClick={handleSave} disabled={loading} icon={<Save className="w-4 h-4" />}>
           {loading ? 'A guardar...' : 'Guardar Alterações'}
         </UIButton>

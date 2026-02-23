@@ -11,6 +11,8 @@ import {
   Gamepad2
 } from 'lucide-react';
 import { UIButton, UICard, UIBadge } from '@/components/ui-components';
+import { StatCard } from '@/components/ui/stat-card';
+import { OrgCard } from '@/components/ui/org-card';
 import { DashboardStats, Aldeia, Evento } from '@/types/project';
 
 interface AdminDashboardViewProps {
@@ -51,26 +53,10 @@ export function AdminDashboardView({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {[
-          { label: 'Total Volume', value: `€${stats?.volumeGlobal || '124,520'}`, icon: TrendingUp, color: 'emerald', trend: '+12.5%' },
-          { label: 'Organizações', value: organizacoes.length.toString(), icon: Building2, color: 'indigo', trend: '+2' },
-          { label: 'Eventos Ativos', value: eventos.filter((e) => e.estado === 'ativo').length.toString(), icon: Calendar, color: 'blue', trend: 'Estável' },
-          { label: 'Utilizadores', value: '1,284', icon: Users, color: 'violet', trend: '+45' },
-        ].map((item, idx) => (
-          <UICard key={idx} className="p-6 relative overflow-hidden group">
-            <div className={`absolute top-0 right-0 w-24 h-24 bg-${item.color}-50 rounded-full -mr-12 -mt-12 group-hover:scale-110 transition-transform`} />
-            <div className={`w-12 h-12 bg-${item.color}-100 text-${item.color}-600 rounded-2xl flex items-center justify-center mb-4 relative z-10`}>
-              <item.icon className="w-6 h-6" />
-            </div>
-            <div className="relative z-10">
-              <p className="text-sm text-gray-500 font-medium">{item.label}</p>
-              <div className="flex items-baseline gap-2">
-                <p className="text-2xl font-bold text-gray-900">{item.value}</p>
-                <span className="text-[10px] text-emerald-600 font-bold">{item.trend}</span>
-              </div>
-            </div>
-          </UICard>
-        ))}
+        <StatCard title="Total Volume" value={`€${stats?.volumeGlobal || '124,520'}`} icon={TrendingUp} trend="+12.5%" />
+        <StatCard title="Organizações" value={organizacoes.length} icon={Building2} />
+        <StatCard title="Eventos Ativos" value={eventos.filter(e => e.estado === 'ativo').length} icon={Calendar} />
+        <StatCard title="Utilizadores" value="1,284" icon={Users} trend="+45" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -82,22 +68,9 @@ export function AdminDashboardView({
             </h2>
             <UIButton variant="ghost" size="sm">Gerir todas</UIButton>
           </div>
-          <div className="flex-1 overflow-auto max-h-[400px]">
+          <div className="flex-1 overflow-auto max-h-[400px] p-4 space-y-2">
             {organizacoes.map((org) => (
-              <div key={org.id} className="p-4 border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors flex items-center justify-between cursor-pointer" onClick={() => onOrgClick(org)}>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-indigo-100 text-indigo-700 rounded-lg flex items-center justify-center font-bold">
-                    {org.nome.charAt(0)}
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold">{org.nome}</p>
-                    <p className="text-xs text-gray-400">{org._count?.eventos || 0} eventos</p>
-                  </div>
-                </div>
-                <UIBadge variant={org.verificada ? 'success' : 'warning'}>
-                  {org.verificada ? 'Verificada' : 'Pendente'}
-                </UIBadge>
-              </div>
+              <OrgCard key={org.id} org={org} />
             ))}
           </div>
         </UICard>
@@ -111,14 +84,14 @@ export function AdminDashboardView({
             <UIButton variant="ghost" size="sm">Ver todos</UIButton>
           </div>
           <div className="flex-1 overflow-auto max-h-[400px]">
-            {eventos.filter((e) => e.estado === 'urgente').map((ev) => (
-              <div key={ev.id} className="p-4 border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors flex items-center justify-between" onClick={() => onEventClick(ev)}>
+            {eventos.filter((e:any) => e.estado === 'urgente').map((ev: any) => (
+              <div key={ev.id} className="p-4 border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors flex items-center justify-between cursor-pointer" onClick={() => onEventClick(ev)}>
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-red-100 text-red-600 rounded-lg flex items-center justify-center">
                     <AlertTriangle className="w-5 h-5" />
                   </div>
                   <div>
-                    <p className="text-sm font-semibold">{ev.titulo}</p>
+                    <p className="text-sm font-semibold">{ev.nome}</p>
                     <p className="text-xs text-gray-400">Termina hoje</p>
                   </div>
                 </div>

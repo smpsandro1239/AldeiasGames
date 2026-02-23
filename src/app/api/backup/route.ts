@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getUserFromRequest } from '@/lib/auth';
+import { db } from '@/lib/db';
 import fs from 'fs';
 import path from 'path';
 
@@ -60,11 +61,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 403 });
     }
 
-    // Verificar se a base de dados existe
-    if (!fs.existsSync(DB_PATH)) {
-      return NextResponse.json({ error: 'Base de dados não encontrada' }, { status: 404 });
-    }
-
     // Criar diretório de backup se não existir
     if (!fs.existsSync(BACKUP_DIR)) {
       fs.mkdirSync(BACKUP_DIR, { recursive: true });
@@ -75,8 +71,15 @@ export async function POST(request: Request) {
     const backupName = `backup-${timestamp}.db`;
     const backupPath = path.join(BACKUP_DIR, backupName);
 
-    // Copiar base de dados
-    fs.copyFileSync(DB_PATH, backupPath);
+    // Usar VACUUM INTO para um backup consistente do SQLite
+    // Isto evita corrupção se houver escritas simultâneas
+    try {
+      await db.$executeRawUnsafe(`VACUUM INTO '${backupPath}'`);
+    } catch (sqliteError) {
+      console.error('Erro ao executar VACUUM INTO, tentando cópia direta:', sqliteError);
+      // Fallback para cópia direta se VACUUM INTO falhar (ex: versão antiga do SQLite)
+      fs.copyFileSync(DB_PATH, backupPath);
+    }
 
     return NextResponse.json({
       success: true,

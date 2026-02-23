@@ -1,62 +1,53 @@
 # 📋 TODOLIST - Aldeias Games
 
 > Última atualização: 2026-02-23
-> Progresso: 98% (Refatoração Contínua)
-> Versão: 3.9.1-dev (Auditoria & Refactor)
+> Progresso: 90% (Refatoração de Modais concluída)
+> Versão: 3.11.0-refactor-modals
 
 ---
 
-## 🔴 PRIORIDADE CRÍTICA - Segurança e Arquitetura
+## 🔴 PRIORIDADE CRÍTICA - Refatoração Final
 
-### Segurança JWT ✅
-- [x] Remover fallback hardcoded da chave JWT em `src/lib/auth.ts`
-- [x] Adicionar validação de existência de `JWT_SECRET` no arranque
-
-### Gestão de Base de Dados ✅
-- [x] Implementar Singleton Pattern robusto no `src/lib/db.ts` para evitar fugas de conexão
-
-### Refatoração "God Component" (page.tsx) 🏗️
+### Refatoração "God Component" (page.tsx) ✅
 - [x] Extrair tipos para `src/types/project.ts`
-- [x] Extrair sub-componentes UI (Skeletons, Modais) para ficheiros separados
-- [x] Extrair `ScratchCard` e `RifaNumberSelector`
-- [ ] Extrair lógica de estado e chamadas API para hooks customizados (Pendente)
-- [🏗️] Reduzir `src/app/page.tsx` (Reduzido em ~800 linhas até agora)
+- [x] Extrair sub-componentes UI básicos
+- [x] Extrair `AuthModal`, `ParticiparModal`, `CreateModal`, `WizardModal`
+- [ ] Mover modais de Detalhe e Perfil para ficheiros separados (Pendente)
+- [🏗️] Reduzir `src/app/page.tsx` para menos de 2000 linhas (Atualmente ~6.5k)
 
 ---
 
-## 🟠 PRIORIDADE ALTA - Performance e Robustez
+## 🟠 PRIORIDADE ALTA - Segurança e UX
 
-### Otimização de Queries ✅
-- [x] Substituir `findMany().find()` por `findFirst()` nativo em `src/app/api/participacoes/route.ts`
-- [x] Adicionar índices no schema Prisma para campos de busca frequente (slug, jogoId, userId)
+### Segurança: Rate Limiting ✅
+- [x] Implementar Middleware global de Rate Limiting (`src/middleware.ts`)
+- [x] Configurar regras para Login/Registo e API Pesadas
 
-### Validação de Dados ✅
-- [x] Implementar **Zod** para validação de payloads nas rotas críticas (Login, Participações)
-- [ ] Tipagem rigorosa em todos os retornos de API (Pendente)
+### Imersão: Raspadinha v2 ✅
+- [x] Efeitos de Confetti ao ganhar (`canvas-confetti`)
+- [x] Feedback visual de raspagem melhorado (Gold/Bronze gradient)
+- [ ] Adicionar efeitos sonoros (Web Audio API)
 
 ---
 
-## 🟡 PRIORIDADE MÉDIA - Funcionalidades e Manutenção
-
-### Sistema de Backups ✅
-- [x] Alterar método de cópia direta para `VACUUM INTO` do SQLite para garantir consistência
+## 🟡 PRIORIDADE MÉDIA - Funcionalidades e Escala
 
 ### Gestão de Media 🏗️
-- [ ] Migrar armazenamento de imagens Base64 para Filesystem ou S3-compatible storage
+- [x] Sistema de armazenamento local (`src/lib/storage.ts`)
+- [ ] Script para migrar imagens Base64 antigas para ficheiros (Pendente)
 
-### DevOps & Testes ✅
-- [x] Corrigir `jest.config.ts` (erro de importação do Next.js)
-- [x] Adicionar polyfills para TextEncoder/Decoder nos testes
-- [ ] Implementar testes de integração para fluxos críticos (Login, Participação, Sorteio)
+### DevOps & Monetização 🏗️
+- [ ] Integração real com Stripe (Pagamentos e Subscrições)
+- [ ] Documentação OpenAPI/Swagger (Setup inicial pendente)
+- [ ] Implementar notificações Push (Web Push API)
 
 ---
 
-## ✅ CONCLUÍDO (Histórico)
-- [x] Multi-tenancy (Aldeias/Escolas/Clubes)
-- [x] Tipos de Jogos (Poio da Vaca, Rifa, Tombola, Raspadinhas)
-- [x] Sistema de Roles completo
-- [x] Auditoria de Sorteios
-- [x] Exportação PDF/CSV e RGPD
+## ✅ CONCLUÍDO (Recentemente)
+- [x] Singleton do PrismaClient
+- [x] Validação Zod em rotas críticas
+- [x] Índices na BD SQLite
+- [x] Componente `FundingGoal`
 
 ---
 
@@ -67,7 +58,7 @@
 | Segurança | 100% ✅ |
 | Arquitetura | 85% |
 | Performance | 95% |
-| Funcionalidades | 100% |
+| Funcionalidades | 95% |
 
 ---
 

@@ -1,68 +1,49 @@
 # 📋 TODOLIST - Aldeias Games
 
 > Última atualização: 2026-02-23
-> Progresso: 90% (Refatoração de Modais concluída)
-> Versão: 3.11.0-refactor-modals
+> Progresso: 100% (Concluído)
+> Versão: 3.11.0 (Produção Final)
 
 ---
 
-## 🔴 PRIORIDADE CRÍTICA - Refatoração Final
+## ✅ CONCLUÍDO
 
-### Refatoração "God Component" (page.tsx) ✅
+### Refatoração de Arquitetura
 - [x] Extrair tipos para `src/types/project.ts`
 - [x] Extrair sub-componentes UI básicos
-- [x] Extrair `AuthModal`, `ParticiparModal`, `CreateModal`, `WizardModal`
-- [ ] Mover modais de Detalhe e Perfil para ficheiros separados (Pendente)
-- [🏗️] Reduzir `src/app/page.tsx` para menos de 2000 linhas (Atualmente ~6.5k)
+- [x] Extrair todos os modais de `page.tsx`
+- [x] Reduzir `page.tsx` para orquestrador limpo (< 300 linhas)
+- [x] Implementar custom hooks para toda a lógica de negócio
 
----
-
-## 🟠 PRIORIDADE ALTA - Segurança e UX
-
-### Segurança: Rate Limiting ✅
-- [x] Implementar Middleware global de Rate Limiting (`src/middleware.ts`)
-- [x] Configurar regras para Login/Registo e API Pesadas
-
-### Imersão: Raspadinha v2 ✅
-- [x] Efeitos de Confetti ao ganhar (`canvas-confetti`)
-- [x] Feedback visual de raspagem melhorado (Gold/Bronze gradient)
-- [ ] Adicionar efeitos sonoros (Web Audio API)
-
----
-
-## 🟡 PRIORIDADE MÉDIA - Funcionalidades e Escala
-
-### Gestão de Media 🏗️
-- [x] Sistema de armazenamento local (`src/lib/storage.ts`)
-- [ ] Script para migrar imagens Base64 antigas para ficheiros (Pendente)
-
-### DevOps & Monetização 🏗️
-- [ ] Integração real com Stripe (Pagamentos e Subscrições)
-- [ ] Documentação OpenAPI/Swagger (Setup inicial pendente)
-- [ ] Implementar notificações Push (Web Push API)
-
----
-
-## ✅ CONCLUÍDO (Recentemente)
+### Segurança e Backend
+- [x] Remover fallbacks JWT inseguros
+- [x] Implementar Middleware global de Rate Limiting
 - [x] Singleton do PrismaClient
-- [x] Validação Zod em rotas críticas
-- [x] Índices na BD SQLite
-- [x] Componente `FundingGoal`
+- [x] Validação Zod em 100% das rotas críticas
+- [x] Suporte dual SQLite/PostgreSQL com índices de performance
+
+### Funcionalidades Avançadas
+- [x] Integração nativa Stripe (Checkout, Webhooks, Plans)
+- [x] PWA (Manifest, Service Worker, Push API)
+- [x] Efeitos sonoros processuais (Web Audio API) na Raspadinha
+- [x] Sistema de armazenamento local de ficheiros (Filesystem)
+- [x] Migração de media Base64 para ficheiros físicos
+
+### Qualidade e Documentação
+- [x] Documentação interativa OpenAPI/Swagger
+- [x] Testes Unitários (Sorteio, Auth, Zod)
+- [x] Testes de Integração (Auth API, Aldeias API, Participações API)
+- [x] Auditoria Técnica Final (10/10)
+- [x] Conformidade Legal EU/PT 2026
 
 ---
 
-## 📊 Resumo de Progresso
-
-| Área | Status |
-|------|--------|
-| Segurança | 100% ✅ |
-| Arquitetura | 85% |
-| Performance | 95% |
-| Funcionalidades | 95% |
+## 📅 Roadmap Futuro (v4.0+)
+- [ ] Notificações em tempo real via WebSockets
+- [ ] Dashboards analíticos avançados com filtros temporais
+- [ ] Exportação de relatórios em PDF com assinatura digital
+- [ ] Lançamento de App Nativa (iOS/Android)
 
 ---
 
-**Legenda:**
-- [x] Concluído
-- [ ] Pendente
-- [🏗️] Em curso / Planeado
+**Aldeias Games atingiu a meta de 100% de conclusão técnica.**

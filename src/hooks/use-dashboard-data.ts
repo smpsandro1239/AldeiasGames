@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
+import { User, DashboardStats } from '@/types/project';
 
-export function useDashboardData(user: any) {
-  const [stats, setStats] = useState<any>(null);
+export function useDashboardData(user: User | null) {
+  const [stats, setStats] = useState<DashboardStats | null>(null);
   const [globalActivity, setGlobalActivity] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 

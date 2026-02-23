@@ -1,9 +1,10 @@
 import { useState, useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
+import { Aldeia, Evento } from '@/types/project';
 
 export function useOrgData() {
-  const [organizacoes, setOrganizacoes] = useState<any[]>([]);
-  const [eventos, setEventos] = useState<any[]>([]);
+  const [organizacoes, setOrganizacoes] = useState<Aldeia[]>([]);
+  const [eventos, setEventos] = useState<Evento[]>([]);
   const [loading, setLoading] = useState(false);
 
   const fetchData = useCallback(async () => {

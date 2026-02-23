@@ -11,6 +11,18 @@ import {
   Gamepad2
 } from 'lucide-react';
 import { UIButton, UICard, UIBadge } from '@/components/ui-components';
+import { DashboardStats, Aldeia, Evento } from '@/types/project';
+
+interface AdminDashboardViewProps {
+  stats: DashboardStats | null;
+  organizacoes: Aldeia[];
+  eventos: Evento[];
+  activeTab: string;
+  onCreateClick: (type: 'organizacao' | 'evento' | 'vendedor' | 'jogo') => void;
+  onOrgClick: (org: Aldeia) => void;
+  onEventClick: (ev: Evento) => void;
+  onExport: (type: string) => void;
+}
 
 export function AdminDashboardView({
   stats,
@@ -20,7 +32,7 @@ export function AdminDashboardView({
   onOrgClick,
   onEventClick,
   onExport
-}: any) {
+}: AdminDashboardViewProps) {
   return (
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -42,7 +54,7 @@ export function AdminDashboardView({
         {[
           { label: 'Total Volume', value: `€${stats?.volumeGlobal || '124,520'}`, icon: TrendingUp, color: 'emerald', trend: '+12.5%' },
           { label: 'Organizações', value: organizacoes.length.toString(), icon: Building2, color: 'indigo', trend: '+2' },
-          { label: 'Eventos Ativos', value: eventos.filter((e:any) => e.status === 'ATIVO').length.toString(), icon: Calendar, color: 'blue', trend: 'Estável' },
+          { label: 'Eventos Ativos', value: eventos.filter((e) => e.estado === 'ativo').length.toString(), icon: Calendar, color: 'blue', trend: 'Estável' },
           { label: 'Utilizadores', value: '1,284', icon: Users, color: 'violet', trend: '+45' },
         ].map((item, idx) => (
           <UICard key={idx} className="p-6 relative overflow-hidden group">
@@ -71,7 +83,7 @@ export function AdminDashboardView({
             <UIButton variant="ghost" size="sm">Gerir todas</UIButton>
           </div>
           <div className="flex-1 overflow-auto max-h-[400px]">
-            {organizacoes.map((org: any) => (
+            {organizacoes.map((org) => (
               <div key={org.id} className="p-4 border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors flex items-center justify-between cursor-pointer" onClick={() => onOrgClick(org)}>
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-indigo-100 text-indigo-700 rounded-lg flex items-center justify-center font-bold">
@@ -99,7 +111,7 @@ export function AdminDashboardView({
             <UIButton variant="ghost" size="sm">Ver todos</UIButton>
           </div>
           <div className="flex-1 overflow-auto max-h-[400px]">
-            {eventos.filter((e:any) => e.status === 'URGENTE').map((ev: any) => (
+            {eventos.filter((e) => e.estado === 'urgente').map((ev) => (
               <div key={ev.id} className="p-4 border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors flex items-center justify-between" onClick={() => onEventClick(ev)}>
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-red-100 text-red-600 rounded-lg flex items-center justify-center">

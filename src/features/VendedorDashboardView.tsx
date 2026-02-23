@@ -10,8 +10,16 @@ import {
 } from 'lucide-react';
 import { UIButton, UICard } from '@/components/ui-components';
 import { soundEngine } from '@/lib/audio-utils';
+import { User, DashboardStats, Evento, Jogo } from '@/types/project';
 
-export function VendedorDashboardView({ user, stats, eventos, onParticipar }: any) {
+interface VendedorDashboardViewProps {
+  user: User;
+  stats: DashboardStats | null;
+  eventos: Evento[];
+  onParticipar: (jogo: Jogo) => void;
+}
+
+export function VendedorDashboardView({ user, stats, eventos, onParticipar }: VendedorDashboardViewProps) {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -84,11 +92,11 @@ export function VendedorDashboardView({ user, stats, eventos, onParticipar }: an
             </div>
           </div>
           <div className="space-y-4">
-            {eventos.map((ev: any) => (
+            {eventos.map((ev) => (
               <div key={ev.id} className="border-b border-gray-100 pb-4 last:border-0">
                 <p className="text-xs font-bold text-indigo-600 uppercase mb-2 tracking-wider">{ev.titulo}</p>
                 <div className="grid gap-2">
-                  {ev.jogos?.map((j: any) => (
+                  {ev.jogos?.map((j) => (
                     <div key={j.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-white hover:ring-2 hover:ring-indigo-500 transition-all group">
                       <div>
                         <p className="font-semibold text-sm">{j.titulo}</p>
@@ -113,7 +121,7 @@ export function VendedorDashboardView({ user, stats, eventos, onParticipar }: an
         </UICard>
 
         <UICard className="p-6">
-          <h2 className="text-lg font-bold mb-6">Atividade Recente</h2>
+          <h2 className="font-bold mb-6">Atividade Recente</h2>
           <div className="space-y-6">
             {[1, 2, 3, 4].map((i) => (
               <div key={i} className="flex gap-4">

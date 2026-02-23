@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
+import { User, Notificacao } from '@/types/project';
 
-export function useNotifications(user: any) {
-  const [notifications, setNotifications] = useState<any[]>([]);
+export function useNotifications(user: User | null) {
+  const [notifications, setNotifications] = useState<Notificacao[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
 
   const fetchNotifications = useCallback(async () => {

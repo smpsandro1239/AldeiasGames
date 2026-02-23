@@ -50,12 +50,17 @@ import { ParticiparModal } from '@/components/modals/ParticiparModal';
 import { OrgDetailModal } from '@/components/modals/OrgDetailModal';
 import { EventDetailModal } from '@/components/modals/EventDetailModal';
 import { PricingModal } from '@/components/modals/PricingModal';
+import { RaspadinhaModal } from '@/components/modals/RaspadinhaModal';
+import { GerirParticipacaoModal } from '@/components/modals/GerirParticipacaoModal';
+
+import { User, Aldeia, Evento, Jogo, Participacao } from '@/types/project';
 
 export default function AldeiasGames() {
   const { user, loading: authLoading, setUser, logout } = useAuthLogic();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isSidebarOpen, setSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+
   const { stats, refresh: refreshStats } = useDashboardData(user);
   const { unreadCount } = useNotifications(user);
   const { organizacoes, eventos, refresh: refreshOrgData } = useOrgData();
@@ -78,10 +83,12 @@ export default function AldeiasGames() {
     history: false,
     wizard: false,
     create: null as 'organizacao' | 'evento' | 'vendedor' | 'jogo' | null,
-    participar: null as any,
-    orgDetail: null as any,
-    eventDetail: null as any,
+    participar: null as Jogo | null,
+    orgDetail: null as Aldeia | null,
+    eventDetail: null as Evento | null,
     pricing: false,
+    raspadinha: null as Participacao | null,
+    gerirParticipacao: null as Participacao | null,
   });
 
   const toggleModal = (key: keyof typeof modals, value: any) => {
@@ -91,7 +98,7 @@ export default function AldeiasGames() {
   const filteredEventos = useMemo(() => {
     if (!searchQuery) return eventos;
     return eventos.filter(ev =>
-      ev.titulo.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      ev.nome.toLowerCase().includes(searchQuery.toLowerCase()) ||
       ev.descricao.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [eventos, searchQuery]);
@@ -115,22 +122,42 @@ export default function AldeiasGames() {
         </div>
       );
     }
-    if (activeTab === 'crm' && user.role === 'ADMIN') return <CRMAdminView stats={stats} />;
+    if (activeTab === 'crm' && user.role === 'super_admin') return <CRMAdminView stats={stats} />;
+
     switch (user.role) {
-      case 'ADMIN': return <AdminDashboardView stats={stats} organizacoes={organizacoes} eventos={eventos} activeTab={activeTab} onCreateClick={(type:any) => toggleModal('create', type)} onOrgClick={(org:any) => toggleModal('orgDetail', org)} onEventClick={(ev:any) => toggleModal('eventDetail', ev)} onExport={exportToExcel} />;
-      case 'VENDEDOR': return <VendedorDashboardView user={user} stats={stats} eventos={eventos} onParticipar={(jogo:any) => toggleModal('participar', jogo)} />;
-      case 'ORGANIZACAO': return <OrganizacaoDashboardView user={user} stats={stats} eventos={eventos} onCreateEvento={() => toggleModal('create', 'evento')} />;
-      default: return <ClienteDashboardView user={user} eventos={filteredEventos} participacoes={minhasParticipacoes} onParticipar={(jogo:any) => toggleModal('participar', jogo)} onRevelar={handleRevelarRaspadinha} />;
+      case 'super_admin':
+      case 'aldeia_admin':
+        return (
+          <AdminDashboardView
+            stats={stats}
+            organizacoes={organizacoes}
+            eventos={eventos}
+            activeTab={activeTab}
+            onCreateClick={(type) => toggleModal('create', type)}
+            onOrgClick={(org) => toggleModal('orgDetail', org)}
+            onEventClick={(ev) => toggleModal('eventDetail', ev)}
+            onExport={exportToExcel}
+          />
+        );
+      case 'vendedor':
+        return <VendedorDashboardView user={user} stats={stats} eventos={eventos} onParticipar={(jogo) => toggleModal('participar', jogo)} />;
+      case 'user':
+      default:
+        return <ClienteDashboardView user={user} eventos={filteredEventos} participacoes={minhasParticipacoes} onParticipar={(jogo: Jogo) => toggleModal('participar', jogo)} onRevelar={async (id) => {
+          const res = await handleRevelarRaspadinha(id);
+          fetchMinhasParticipacoes();
+          return res;
+        }} />;
     }
   };
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'eventos', label: 'Eventos', icon: Calendar },
-    { id: 'historico', label: 'Meu Histórico', icon: History, roles: ['CLIENTE'] },
-    { id: 'crm', label: 'Gestão CRM', icon: Users, roles: ['ADMIN'] },
-    { id: 'stats', label: 'Estatísticas', icon: TrendingUp, roles: ['ADMIN', 'ORGANIZACAO'] },
-    { id: 'config', label: 'Configurações', icon: Settings, roles: ['ADMIN'] },
+    { id: 'historico', label: 'Meu Histórico', icon: History, roles: ['user'] },
+    { id: 'crm', label: 'Gestão CRM', icon: Users, roles: ['super_admin'] },
+    { id: 'stats', label: 'Estatísticas', icon: TrendingUp, roles: ['super_admin', 'aldeia_admin'] },
+    { id: 'config', label: 'Configurações', icon: Settings, roles: ['super_admin'] },
   ];
 
   const filteredNavItems = navItems.filter(item => !item.roles || (user && item.roles.includes(user.role)));
@@ -201,10 +228,10 @@ export default function AldeiasGames() {
           <div className="max-w-7xl mx-auto space-y-8">{renderContent()}</div>
         </main>
       </div>
-      <AuthModal isOpen={modals.auth} onClose={() => toggleModal('auth', false)} onSuccess={(userData:any) => { setUser(userData); toggleModal('auth', false); }} />
+      <AuthModal isOpen={modals.auth} onClose={() => toggleModal('auth', false)} onSuccess={(userData) => { setUser(userData); toggleModal('auth', false); }} />
       {user && (
         <>
-          <ProfileModal isOpen={modals.profile} onClose={() => toggleModal('profile', false)} user={user} onUpdate={setUser} />
+          <ProfileModal isOpen={modals.profile} onClose={() => toggleModal('profile', false)} user={user} onUpdate={(u: User) => setUser(u)} />
           <PaymentHistoryModal isOpen={modals.history} onClose={() => toggleModal('history', false)} userId={user.id} />
           <WizardModal isOpen={modals.wizard} onClose={() => toggleModal('wizard', false)} user={user} onComplete={refreshStats} />
           <CreateModal type={modals.create} onClose={() => toggleModal('create', null)} onSuccess={() => { refreshOrgData(); refreshStats(); toggleModal('create', null); }} />
@@ -212,6 +239,8 @@ export default function AldeiasGames() {
           <OrgDetailModal org={modals.orgDetail} onClose={() => toggleModal('orgDetail', null)} onUpdate={refreshOrgData} />
           <EventDetailModal evento={modals.eventDetail} onClose={() => toggleModal('eventDetail', null)} onUpdate={refreshOrgData} />
           <PricingModal isOpen={modals.pricing} onClose={() => toggleModal('pricing', false)} currentPlan="Aldeia Grátis" />
+          <RaspadinhaModal isOpen={!!modals.raspadinha} onClose={() => toggleModal('raspadinha', null)} participacao={modals.raspadinha} onRevelar={handleRevelarRaspadinha} />
+          <GerirParticipacaoModal isOpen={!!modals.gerirParticipacao} onClose={() => toggleModal('gerirParticipacao', null)} participacao={modals.gerirParticipacao} onAnular={() => {}} onTrocar={() => {}} />
         </>
       )}
       {!user && (

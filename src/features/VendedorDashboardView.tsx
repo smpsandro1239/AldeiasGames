@@ -9,6 +9,7 @@ import {
   Search
 } from 'lucide-react';
 import { UIButton, UICard } from '@/components/ui-components';
+import { StatCard } from '@/components/ui/stat-card';
 import { soundEngine } from '@/lib/audio-utils';
 import { User, DashboardStats, Evento, Jogo } from '@/types/project';
 
@@ -38,44 +39,9 @@ export function VendedorDashboardView({ user, stats, eventos, onParticipar }: Ve
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <UICard className="p-6 bg-indigo-600 text-white border-none shadow-indigo-100">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="p-3 bg-white/10 rounded-xl">
-              <TrendingUp className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <p className="text-indigo-100 text-sm">Vendas de Hoje</p>
-              <p className="text-2xl font-bold">€{stats?.vendasHoje || '0.00'}</p>
-            </div>
-          </div>
-          <p className="text-indigo-200 text-xs">+{stats?.crescimento || '12'}% em relação a ontem</p>
-        </UICard>
-
-        <UICard className="p-6">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="p-3 bg-green-100 text-green-600 rounded-xl">
-              <Users className="w-6 h-6" />
-            </div>
-            <div>
-              <p className="text-gray-500 text-sm">Clientes Atendidos</p>
-              <p className="text-2xl font-bold text-gray-900">{stats?.clientesHoje || '0'}</p>
-            </div>
-          </div>
-          <p className="text-gray-400 text-xs">Média de €{stats?.ticketMedio || '15.50'} por cliente</p>
-        </UICard>
-
-        <UICard className="p-6">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="p-3 bg-amber-100 text-amber-600 rounded-xl">
-              <CreditCard className="w-6 h-6" />
-            </div>
-            <div>
-              <p className="text-gray-500 text-sm">Comissão Acumulada</p>
-              <p className="text-2xl font-bold text-gray-900">€{stats?.comissao || '0.00'}</p>
-            </div>
-          </div>
-          <p className="text-gray-400 text-xs">Pagamento automático em 2 dias</p>
-        </UICard>
+        <StatCard title="Vendas de Hoje" value={`€${stats?.vendasHoje || '0.00'}`} icon={TrendingUp} trend="+12%" />
+        <StatCard title="Clientes Atendidos" value={stats?.clientesHoje || '0'} icon={Users} />
+        <StatCard title="Comissão Acumulada" value={`€${stats?.comissao || '0.00'}`} icon={CreditCard} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -84,17 +50,13 @@ export function VendedorDashboardView({ user, stats, eventos, onParticipar }: Ve
             <h2 className="text-lg font-bold">Disponível para Venda</h2>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Procurar jogo..."
-                className="pl-10 pr-4 py-1.5 bg-gray-50 border-none rounded-lg text-sm w-48"
-              />
+              <input type="text" placeholder="Procurar jogo..." className="pl-10 pr-4 py-1.5 bg-gray-50 border-none rounded-lg text-sm w-48" />
             </div>
           </div>
           <div className="space-y-4">
             {eventos.map((ev) => (
               <div key={ev.id} className="border-b border-gray-100 pb-4 last:border-0">
-                <p className="text-xs font-bold text-indigo-600 uppercase mb-2 tracking-wider">{ev.titulo}</p>
+                <p className="text-xs font-bold text-indigo-600 uppercase mb-2 tracking-wider">{ev.nome}</p>
                 <div className="grid gap-2">
                   {ev.jogos?.map((j) => (
                     <div key={j.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-white hover:ring-2 hover:ring-indigo-500 transition-all group">
@@ -102,43 +64,13 @@ export function VendedorDashboardView({ user, stats, eventos, onParticipar }: Ve
                         <p className="font-semibold text-sm">{j.titulo}</p>
                         <p className="text-xs text-gray-500">Preço: €{j.precoParticipacao.toFixed(2)}</p>
                       </div>
-                      <UIButton
-                        size="sm"
-                        icon={<QrCode className="w-4 h-4" />}
-                        onClick={() => {
-                          soundEngine.playClick();
-                          onParticipar(j);
-                        }}
-                      >
-                        Vender
-                      </UIButton>
+                      <UIButton size="sm" icon={<QrCode className="w-4 h-4" />} onClick={() => { soundEngine.playClick(); onParticipar(j); }}>Vender</UIButton>
                     </div>
                   ))}
                 </div>
               </div>
             ))}
           </div>
-        </UICard>
-
-        <UICard className="p-6">
-          <h2 className="font-bold mb-6">Atividade Recente</h2>
-          <div className="space-y-6">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="flex gap-4">
-                <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
-                  <TrendingUp className="w-5 h-5 text-gray-400" />
-                </div>
-                <div className="flex-1">
-                  <div className="flex justify-between">
-                    <p className="text-sm font-semibold">Venda Registada</p>
-                    <p className="text-xs text-gray-400">Há {i*5} min</p>
-                  </div>
-                  <p className="text-xs text-gray-500">Raspadinha de Verão - €5.00</p>
-                </div>
-              </div>
-            ))}
-          </div>
-          <UIButton variant="secondary" className="w-full mt-6">Ver Todo o Histórico</UIButton>
         </UICard>
       </div>
     </div>

@@ -3,9 +3,9 @@
  */
 
 // Enums
-export type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'VENDEDOR' | 'CLIENTE';
+export type UserRole = 'super_admin' | 'aldeia_admin' | 'vendedor' | 'user';
 export type TipoOrg = 'aldeia' | 'escola' | 'associacao_pais' | 'clube';
-export type TipoJogo = 'POIO_VACA' | 'RIFA' | 'RASPADINHA' | 'TOMBOLA';
+export type TipoJogo = 'poio_vaca' | 'rifa' | 'raspadinha' | 'tombola';
 export type EstadoJogo = 'ativo' | 'suspenso' | 'concluido';
 
 // Core Entities
@@ -59,12 +59,12 @@ export interface Aldeia {
 export interface Evento {
   id: string;
   aldeiaId: string;
-  titulo: string;
+  nome: string;
   descricao: string;
   dataInicio: string;
   dataFim: string;
   estado: 'ativo' | 'concluido' | 'urgente';
-  banner?: string;
+  imageUrl?: string;
   objectivoAngariacao?: number;
   slug: string;
   ativo: boolean;
@@ -111,13 +111,11 @@ export interface Participacao {
   ganhou: boolean;
   premio?: string;
 
-  // Client identification for sales by vendors
   adminRegistouId?: string;
   nomeCliente?: string;
   telefoneCliente?: string;
   emailCliente?: string;
 
-  // Fairness auditing
   numeroCartao?: number;
   seed?: string;
   hash?: string;
@@ -148,7 +146,6 @@ export interface Notificacao {
   createdAt: string;
 }
 
-// UI & API Types
 export interface DashboardStats {
   volumeGlobal?: string;
   totalAngariado: number;

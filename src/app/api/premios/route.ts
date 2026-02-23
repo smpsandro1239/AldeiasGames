@@ -1,37 +1,27 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import jwt from 'jsonwebtoken';
+import { getUserFromRequest } from '@/lib/auth';
+import { saveBase64Image } from '@/lib/storage';
 
-// GET - Listar prémios
-export async function GET(request: NextRequest) {
+export async function GET(request: Request) {
   try {
-    const token = request.headers.get('Authorization')?.replace('Bearer ', '');
-    if (!token) {
-      return NextResponse.json({ error: 'Token não fornecido' }, { status: 401 });
-    }
+    const user = await getUserFromRequest(request);
+    if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'aldeias-secret-key-2024') as any;
-    
     let premios;
-    if (decoded.role === 'super_admin') {
-      // Super admin vê todos os prémios
+    if (user.role === 'super_admin') {
       premios = await db.premio.findMany({
         include: {
-          aldeia: {
-            select: { id: true, nome: true, tipoOrganizacao: true }
-          },
+          aldeia: { select: { id: true, nome: true, tipoOrganizacao: true } },
           _count: { select: { jogos: true } }
         },
         orderBy: [{ ordem: 'asc' }, { createdAt: 'desc' }]
       });
     } else {
-      // Aldeia admin vê apenas prémios da sua aldeia
       premios = await db.premio.findMany({
-        where: { aldeiaId: decoded.aldeiaId },
+        where: { aldeiaId: user.aldeiaId },
         include: {
-          aldeia: {
-            select: { id: true, nome: true, tipoOrganizacao: true }
-          },
+          aldeia: { select: { id: true, nome: true, tipoOrganizacao: true } },
           _count: { select: { jogos: true } }
         },
         orderBy: [{ ordem: 'asc' }, { createdAt: 'desc' }]
@@ -45,53 +35,34 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST - Criar prémio
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
-    const token = request.headers.get('Authorization')?.replace('Bearer ', '');
-    if (!token) {
-      return NextResponse.json({ error: 'Token não fornecido' }, { status: 401 });
-    }
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'aldeias-secret-key-2024') as any;
-    
-    if (!['super_admin', 'aldeia_admin'].includes(decoded.role)) {
+    const user = await getUserFromRequest(request);
+    if (!user || !['super_admin', 'aldeia_admin'].includes(user.role)) {
       return NextResponse.json({ error: 'Sem permissão' }, { status: 403 });
     }
 
     const body = await request.json();
     const { nome, descricao, valorEstimado, imagemBase64, patrocinador, ordem, aldeiaId } = body;
 
-    if (!nome || !nome.trim()) {
-      return NextResponse.json({ error: 'Nome do prémio é obrigatório' }, { status: 400 });
-    }
+    const targetAldeiaId = user.role === 'super_admin' ? aldeiaId : user.aldeiaId;
+    if (!targetAldeiaId) return NextResponse.json({ error: 'Aldeia não especificada' }, { status: 400 });
 
-    // Determinar aldeiaId
-    const targetAldeiaId = decoded.role === 'super_admin' ? aldeiaId : decoded.aldeiaId;
-    
-    if (!targetAldeiaId) {
-      return NextResponse.json({ error: 'Aldeia não especificada' }, { status: 400 });
-    }
-
-    // Verificar se a aldeia existe
-    const aldeia = await db.aldeia.findUnique({ where: { id: targetAldeiaId } });
-    if (!aldeia) {
-      return NextResponse.json({ error: 'Organização não encontrada' }, { status: 404 });
+    let finalImageUrl = body.imageUrl || null;
+    if (imagemBase64) {
+      finalImageUrl = await saveBase64Image(imagemBase64);
     }
 
     const premio = await db.premio.create({
       data: {
-        nome: nome.trim(),
-        descricao: descricao?.trim() || null,
+        nome,
+        descricao,
         valorEstimado: valorEstimado ? parseFloat(valorEstimado) : null,
-        imagemBase64: imagemBase64 || null,
-        patrocinador: patrocinador?.trim() || null,
+        imagemBase64: null,
+        imageUrl: finalImageUrl,
+        patrocinador,
         ordem: ordem ? parseInt(ordem) : 0,
-        ativo: true,
         aldeiaId: targetAldeiaId
-      },
-      include: {
-        aldeia: { select: { id: true, nome: true } }
       }
     });
 

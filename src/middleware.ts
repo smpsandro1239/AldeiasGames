@@ -1,50 +1,66 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { checkRateLimit, getClientIdentifier } from '@/lib/rate-limit';
+import { rateLimit, getClientIp } from '@/lib/rate-limit';
 
 export function middleware(request: NextRequest) {
-  // Apenas aplicar rate limit às rotas de API
+  // Apenas aplicar rate limit as rotas de API
   if (request.nextUrl.pathname.startsWith('/api')) {
-    const identifier = getClientIdentifier(request as any);
+    const ip = getClientIp(request);
 
-    // Determinar endpoint para regras específicas
-    let endpoint = 'api/default';
-    if (request.nextUrl.pathname.includes('/auth/login')) endpoint = 'auth/login';
-    if (request.nextUrl.pathname.includes('/auth/register')) endpoint = 'auth/register';
-    if (request.nextUrl.pathname.includes('/backup')) endpoint = 'api/heavy';
-    if (request.nextUrl.pathname.includes('/export')) endpoint = 'api/heavy';
+    // Limites mais restritos para autenticacao
+    if (
+      request.nextUrl.pathname.includes('/api/auth/login') ||
+      request.nextUrl.pathname.includes('/api/auth/register')
+    ) {
+      const result = rateLimit(`auth:${ip}`, { maxRequests: 5, windowMs: 15 * 60 * 1000 });
 
-    const { allowed, remaining, resetTime } = checkRateLimit(identifier, endpoint);
-
-    if (!allowed) {
-      return NextResponse.json(
-        {
-          error: 'Demasiados pedidos. Por favor, tente mais tarde.',
-          retryAfter: Math.ceil((resetTime - Date.now()) / 1000)
-        },
-        {
-          status: 429,
-          headers: {
-            'Retry-After': Math.ceil((resetTime - Date.now()) / 1000).toString(),
-            'X-RateLimit-Limit': 'Regra dependente',
-            'X-RateLimit-Remaining': '0',
-            'X-RateLimit-Reset': resetTime.toString()
+      if (!result.success) {
+        return NextResponse.json(
+          {
+            error: 'Demasiadas tentativas. Tente novamente mais tarde.',
+            retryAfter: result.retryAfter,
+          },
+          {
+            status: 429,
+            headers: {
+              'Retry-After': String(result.retryAfter ?? 60),
+              'X-RateLimit-Limit': '5',
+              'X-RateLimit-Remaining': '0',
+              'X-RateLimit-Reset': String(result.resetAt),
+            },
           }
-        }
-      );
-    }
+        );
+      }
+    } else {
+      // Rate limit geral para outras APIs
+      const result = rateLimit(`api:${ip}`, { maxRequests: 100, windowMs: 60 * 1000 });
 
-    // Adicionar headers de rate limit à resposta bem-sucedida
-    const response = NextResponse.next();
-    response.headers.set('X-RateLimit-Remaining', remaining.toString());
-    response.headers.set('X-RateLimit-Reset', resetTime.toString());
-    return response;
+      if (!result.success) {
+        return NextResponse.json(
+          {
+            error: 'Limite de pedidos excedido. Tente novamente em breve.',
+            retryAfter: result.retryAfter,
+          },
+          {
+            status: 429,
+            headers: {
+              'Retry-After': String(result.retryAfter ?? 60),
+              'X-RateLimit-Limit': '100',
+              'X-RateLimit-Remaining': String(result.remaining),
+              'X-RateLimit-Reset': String(result.resetAt),
+            },
+          }
+        );
+      }
+    }
   }
 
   return NextResponse.next();
 }
 
-// Configurar as rotas onde o middleware deve correr
 export const config = {
-  matcher: '/api/:path*',
+  matcher: [
+    // Aplicar a todas as rotas de API exceto health check
+    '/api/((?!health$).*)',
+  ],
 };

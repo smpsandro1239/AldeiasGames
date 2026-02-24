@@ -50,3 +50,26 @@ prompt
 server.log
 # Skills directory
 /skills/
+# Package managers - usar apenas bun
+package-lock.json
+yarn.lock
+
+# Scripts de desenvolvimento e utilitarios
+scripts/
+
+# Base de dados local duplicada
+db/
+
+# Uploads locais
+public/uploads/*
+!public/uploads/.gitkeep
+
+# Logs
+logs/
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

@@ -1,0 +1,90 @@
+name: CI/CD - Aldeias Games
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-e-testes:
+    name: Lint e Testes
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do repositorio
+        uses: actions/checkout@v4
+
+      - name: Instalar Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Instalar dependencias
+        run: bun install --frozen-lockfile
+
+      - name: Verificar tipos TypeScript
+        run: bunx tsc --noEmit
+
+      - name: Lint ESLint
+        run: bun run lint
+
+      - name: Executar testes
+        run: bun test
+        env:
+          DATABASE_URL: file:./prisma/db/test.db
+          JWT_SECRET: chave-secreta-para-testes-ci-12345678
+
+  build:
+    name: Build de Producao
+    runs-on: ubuntu-latest
+    needs: lint-e-testes
+
+    steps:
+      - name: Checkout do repositorio
+        uses: actions/checkout@v4
+
+      - name: Instalar Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Instalar dependencias
+        run: bun install --frozen-lockfile
+
+      - name: Gerar cliente Prisma
+        run: bunx prisma generate
+
+      - name: Build Next.js
+        run: bun run build
+        env:
+          DATABASE_URL: file:./prisma/db/test.db
+          JWT_SECRET: chave-secreta-para-build-ci-12345678
+          NEXT_PUBLIC_BASE_URL: http://localhost:3000
+
+      - name: Verificar artefactos de build
+        run: ls -la .next/
+
+  docker:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout do repositorio
+        uses: actions/checkout@v4
+
+      - name: Build imagem Docker
+        run: docker build -t aldeias-games:latest .
+
+      - name: Testar imagem Docker
+        run: |
+          docker run -d --name test-app \
+            -e DATABASE_URL=file:./prisma/db/custom.db \
+            -e JWT_SECRET=chave-para-teste-docker-12345678 \
+            -e NEXT_PUBLIC_BASE_URL=http://localhost:3000 \
+            -p 3000:3000 aldeias-games:latest
+          sleep 15
+          curl -f http://localhost:3000/api || exit 1
+          docker stop test-app

@@ -35,7 +35,6 @@ import { LoadingScreen } from '@/components/LoadingScreen';
 // Dashboard Views
 import { AdminDashboardView } from '@/features/AdminDashboardView';
 import { VendedorDashboardView } from '@/features/VendedorDashboardView';
-import { OrganizacaoDashboardView } from '@/features/OrganizacaoDashboardView';
 import { NotificacoesModal } from '@/components/notificacoes-modal';
 import { ClienteDashboardView } from '@/features/ClienteDashboardView';
 import { CRMAdminView } from '@/features/CRMAdminView';

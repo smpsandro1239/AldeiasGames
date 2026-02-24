@@ -18,9 +18,9 @@ export const metadata: Metadata = {
   title: "Aldeias Games - Jogos Tradicionais Portugueses",
   description: "Plataforma SaaS multi-tenant para angariação de fundos através de jogos tradicionais portugueses.",
   keywords: ["Aldeias", "Jogos", "Rifa", "Tombola", "Poio da Vaca", "Portugal", "Angariação de fundos"],
-  authors: [{ name: "Aldeias Games Team" }],
+  authors: [{ name: "Sandro Pereira" }],
   icons: {
-    icon: "/favicon.ico",
+    icon: "/favicon.svg",
   },
   openGraph: {
     title: "Aldeias Games",

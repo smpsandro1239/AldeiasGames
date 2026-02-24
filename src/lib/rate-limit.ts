@@ -1,99 +1,112 @@
-// Rate Limiting simples em memória
-// Para produção escala, usar Redis ou Upstash
+import { NextRequest } from 'next/server';
+
+/**
+ * Rate Limiter em memoria - adequado para desenvolvimento e instancia unica.
+ *
+ * ATENCAO: Em producao com multiplas instancias (Docker Swarm, Kubernetes etc.)
+ * migrar para solucao distribuida como:
+ * - Upstash Redis: https://upstash.com
+ * - @vercel/kv
+ * - ioredis com Redis standalone
+ *
+ * Exemplo com Upstash: https://github.com/upstash/ratelimit
+ */
 
 interface RateLimitEntry {
   count: number;
-  resetTime: number;
+  resetAt: number;
 }
 
-const rateLimits = new Map<string, RateLimitEntry>();
+const store = new Map<string, RateLimitEntry>();
 
-// Limpeza periódica (apenas se não estivermos no middleware do Next.js Edge)
-if (typeof window === 'undefined' && typeof process !== 'undefined' && process.env.NEXT_RUNTIME !== 'edge') {
+// Limpar entradas expiradas a cada 5 minutos
+if (typeof setInterval !== 'undefined') {
   setInterval(() => {
     const now = Date.now();
-    for (const [key, entry] of rateLimits.entries()) {
-      if (entry.resetTime < now) {
-        rateLimits.delete(key);
-      }
+    for (const [key, entry] of store.entries()) {
+      if (now > entry.resetAt) store.delete(key);
     }
-  }, 60000);
+  }, 5 * 60 * 1000);
 }
 
 export interface RateLimitConfig {
-  windowMs: number;  // Janela de tempo em milissegundos
-  maxRequests: number; // Máximo de requests por janela
+  /** Numero maximo de pedidos permitidos na janela */
+  maxRequests: number;
+  /** Duracao da janela em milissegundos */
+  windowMs: number;
 }
 
-export const RATE_LIMITS: Record<string, RateLimitConfig> = {
-  // Autenticação
-  'auth/login': { windowMs: 60000, maxRequests: 10 },      // 10 tentativas por minuto
-  'auth/register': { windowMs: 60000, maxRequests: 5 },    // 5 registos por minuto
-  'auth/reset': { windowMs: 60000, maxRequests: 3 },       // 3 resets por minuto
-  
-  // API geral
-  'api/default': { windowMs: 60000, maxRequests: 200 },    // 200 requests por minuto
-  'api/heavy': { windowMs: 60000, maxRequests: 50 },       // 50 requests pesados por minuto
-};
+export interface RateLimitResult {
+  success: boolean;
+  remaining: number;
+  resetAt: number;
+  retryAfter?: number;
+}
 
-export function checkRateLimit(
-  identifier: string, 
-  endpoint: string
-): { allowed: boolean; remaining: number; resetTime: number } {
-  const config = RATE_LIMITS[endpoint] || RATE_LIMITS['api/default'];
-  const key = `${identifier}:${endpoint}`;
+/**
+ * Verifica se um pedido deve ser limitado.
+ * @param key Identificador unico (IP, userId, etc.)
+ * @param config Configuracao dos limites
+ */
+export function rateLimit(
+  key: string,
+  config: RateLimitConfig = { maxRequests: 10, windowMs: 60_000 }
+): RateLimitResult {
   const now = Date.now();
-  
-  const entry = rateLimits.get(key);
-  
-  if (!entry || entry.resetTime < now) {
-    // Criar nova entrada
-    const newEntry = {
-      count: 1,
-      resetTime: now + config.windowMs
-    };
-    rateLimits.set(key, newEntry);
-    
-    return {
-      allowed: true,
-      remaining: config.maxRequests - 1,
-      resetTime: newEntry.resetTime
-    };
+  const entry = store.get(key);
+
+  if (!entry || now > entry.resetAt) {
+    const resetAt = now + config.windowMs;
+    store.set(key, { count: 1, resetAt });
+    return { success: true, remaining: config.maxRequests - 1, resetAt };
   }
-  
+
   if (entry.count >= config.maxRequests) {
-    // Limite excedido
     return {
-      allowed: false,
+      success: false,
       remaining: 0,
-      resetTime: entry.resetTime
+      resetAt: entry.resetAt,
+      retryAfter: Math.ceil((entry.resetAt - now) / 1000),
     };
   }
-  
-  // Incrementar contador
+
   entry.count++;
-  
+  store.set(key, entry);
   return {
-    allowed: true,
+    success: true,
     remaining: config.maxRequests - entry.count,
-    resetTime: entry.resetTime
+    resetAt: entry.resetAt,
   };
 }
 
-export function getClientIdentifier(request: Request): string {
-  // Tentar obter IP do request
-  const forwarded = request.headers.get('x-forwarded-for');
-  const realIp = request.headers.get('x-real-ip');
-  
-  if (forwarded) {
-    return forwarded.split(',')[0].trim();
-  }
-  
-  if (realIp) {
-    return realIp;
-  }
-  
-  // Fallback para user-agent (menos ideal)
-  const userAgent = request.headers.get('user-agent') || 'unknown';
-  return `ua:${userAgent.slice(0, 50)}`;
+/**
+ * Extrai o IP real do pedido, considerando proxies.
+ */
+export function getClientIp(request: NextRequest): string {
+  return (
+    request.headers.get('x-real-ip') ??
+    request.headers.get('x-forwarded-for')?.split(',')[0].trim() ??
+    request.headers.get('cf-connecting-ip') ??
+    'unknown'
+  );
 }
+
+/**
+ * Middleware helper para aplicar rate limiting facilmente nas rotas.
+ */
+export function createRateLimiter(
+  maxRequests: number,
+  windowMs: number,
+  keyPrefix = 'rl'
+) {
+  return (request: NextRequest) => {
+    const ip = getClientIp(request);
+    const key = `${keyPrefix}:${ip}`;
+    return rateLimit(key, { maxRequests, windowMs });
+  };
+}
+
+// Limitadores pre-configurados
+export const authLimiter = createRateLimiter(5, 15 * 60 * 1000, 'auth');
+export const apiLimiter = createRateLimiter(100, 60 * 1000, 'api');
+export const uploadLimiter = createRateLimiter(10, 60 * 1000, 'upload');

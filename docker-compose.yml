@@ -1,17 +1,27 @@
-version: '3.8'
-
 services:
   app:
     build: .
     ports:
       - "3000:3000"
     environment:
-      - DATABASE_URL=file:./db/custom.db
+      - DATABASE_URL=file:./prisma/db/custom.db
       - JWT_SECRET=${JWT_SECRET}
-      - NEXT_PUBLIC_BASE_URL=${NEXT_PUBLIC_BASE_URL}
+      - NEXT_PUBLIC_BASE_URL=${NEXT_PUBLIC_BASE_URL:-http://localhost:3000}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
+      - NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=${NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY:-}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-}
     volumes:
-      - ./db:/app/db
+      - ./prisma/db:/app/prisma/db
       - ./public/uploads:/app/public/uploads
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - aldeias-network
 
   caddy:
     image: caddy:latest
@@ -23,8 +33,16 @@ services:
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
-      - app
+      app:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - aldeias-network
 
 volumes:
   caddy_data:
   caddy_config:
+
+networks:
+  aldeias-network:
+    driver: bridge

@@ -1,3 +1,44 @@
+---
+Task ID: v3.12.0-Auditoria-e-Melhorias
+Agent: Sandro Pereira
+Task: Auditoria Técnica Completa e Correção de Problemas Identificados
+
+Work Log:
+- Adicionado modelo Plano ao schema.prisma (era referenciado mas inexistente)
+- LogAcesso.userId tornado nullable para registar logins falhados
+- Campo duplicado `revelada` removido do schema
+- Service Worker corrigido para não cachear endpoints de API dinâmicos
+- next.config.ts: removido ignoreBuildErrors, ativado reactStrictMode, adicionados security headers
+- tsconfig.json: noImplicitAny: true, strictNullChecks: true, target ES2020
+- .env.example criado com todas as variáveis documentadas
+- .gitignore melhorado para excluir package-lock.json, scripts/, db/
+- Dockerfile melhorado: utilizador não-root, healthcheck, copy prisma correto
+- docker-compose.yml: restart policies, health conditions, redes Docker
+- Caddyfile atualizado para configuração de produção com HTTPS
+- Validações: password mínimo aumentado de 6 para 8 caracteres
+- stripe.ts: removido fallback sk_test_dummy, erro explícito em produção
+- auth.ts: fallback JWT inseguro substituído por erro explícito
+- page.tsx: Bell button com handler onClick, Toaster sonner duplicado removido
+- NotificacoesModal integrado com auto-fetch e onClose prop simplificado
+- Import morto OrganizacaoDashboardView removido de page.tsx
+- middleware.ts: atualizado para nova API rate-limit
+- rate-limit.ts: reescrito com configurações pré-definidas e documentação Redis
+- GitHub Actions CI/CD criado (.github/workflows/ci.yml)
+- favicon.svg criado
+- public/uploads/.gitkeep criado
+- src/lib/pagination.ts criado com helper de paginação
+- Paginação adicionada às APIs de jogos e eventos
+- CONTRIBUTING.md criado com guia completo
+- CHANGELOG.md criado com histórico de versões
+- package.json: autor atualizado para Sandro Pereira
+- layout.tsx: favicon.svg e autor Sandro Pereira
+- Scripts de desenvolvimento removidos do repositório
+- Base de dados duplicada db/ removida do repositório
+- package-lock.json removido (projeto usa Bun)
+
+Status: COMPLETO
+Date: 2026-02-24
+
 # Aldeias Games - Development Worklog
 
 ---

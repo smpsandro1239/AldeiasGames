@@ -1,7 +1,7 @@
 # 🔍 AUDITORIA TÉCNICA COMPLETA — Aldeias Games 2026
 
 > **Data da Auditoria:** 2026-02-24  
-> **Auditor:** Agent Zero — Análise Automatizada Profunda  
+> **Auditor:** Sandro Pereira  
 > **Versão Auditada:** 3.11.0-dev  
 > **Ficheiros Analisados:** 180+ ficheiros  
 > **Estado Geral:** ⚠️ Pronto para Dev — Requer correções antes de Produção
@@ -770,5 +770,5 @@ Verifica hash integridade → Revela resultado
 
 ---
 
-*Auditoria realizada por Agent Zero em 2026-02-24*  
+*Auditoria realizada por Sandro Pereira em 2026-02-24*  
 *Todos os ficheiros do projeto foram analisados individualmente.*

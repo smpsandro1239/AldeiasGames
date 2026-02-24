@@ -184,11 +184,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
                       <Button variant="secondary" size="sm" className="text-[10px]"
                         onClick={() => handleQuickLogin('admin@aldeias.pt', 'Admin1234!')}>Super Admin</Button>
                       <Button variant="secondary" size="sm" className="text-[10px]"
-                        onClick={() => handleQuickLogin('admin@aldeias.pt', 'Admin1234!')}>Admin Aldeia</Button>
+                        onClick={() => handleQuickLogin('aldeia@gmail.com', '123456')}>Admin Aldeia</Button>
                       <Button variant="secondary" size="sm" className="text-[10px]"
-                        onClick={() => handleQuickLogin('admin@aldeias.pt', 'Admin1234!')}>Vendedor</Button>
+                        onClick={() => handleQuickLogin('vendedor@gmail.com', '123456')}>Vendedor</Button>
                       <Button variant="secondary" size="sm" className="text-[10px]"
-                        onClick={() => handleQuickLogin('admin@aldeias.pt', 'Admin1234!')}>Jogador</Button>
+                        onClick={() => handleQuickLogin('jogador@gmail.com', '123456')}>Jogador</Button>
                     </div>
                   </div>
                 )}

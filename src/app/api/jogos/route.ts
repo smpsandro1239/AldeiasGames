@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { getPaginacaoParams, respostaPaginada } from '@/lib/pagination';
 import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
 import { jogoSchema } from '@/lib/validations';
@@ -9,6 +10,8 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const eventoId = searchParams.get('eventoId');
     const where = eventoId ? { eventoId } : {};
+    const paginacao = getPaginacaoParams(searchParams);
+    const total = await db.jogo.count({ where });
     
     const jogos = await db.jogo.findMany({
       where,
@@ -27,7 +30,9 @@ export async function GET(request: Request) {
         premio: true,
         _count: { select: { participacoes: true } }
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
+      skip: paginacao.skip,
+      take: paginacao.limite,
     });
 
     const jogosProcessados = jogos.map(jogo => ({
@@ -35,7 +40,7 @@ export async function GET(request: Request) {
       premiosRaspadinha: jogo.premiosRaspadinha ? JSON.parse(jogo.premiosRaspadinha) : null,
     }));
 
-    return NextResponse.json(jogosProcessados);
+    return respostaPaginada(jogosProcessados, total, paginacao);
   } catch (error) {
     console.error('Erro ao buscar jogos:', error);
     return NextResponse.json({ error: 'Erro ao buscar jogos' }, { status: 500 });

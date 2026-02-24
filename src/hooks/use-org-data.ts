@@ -11,15 +11,18 @@ export function useOrgData() {
     setLoading(true);
     try {
       const [resOrg, resEv] = await Promise.all([
-        fetch('/api/organizacoes'),
+        fetch('/api/aldeias'),
         fetch('/api/eventos')
       ]);
 
-      const orgs = await resOrg.json();
-      const evs = await resEv.json();
+      const orgsData = await resOrg.json();
+      const evsData = await resEv.json();
 
-      if (Array.isArray(orgs)) setOrganizacoes(orgs);
-      if (Array.isArray(evs)) setEventos(evs);
+      const orgs = Array.isArray(orgsData) ? orgsData : (orgsData?.dados ?? []);
+      const evs = Array.isArray(evsData) ? evsData : (evsData?.dados ?? []);
+
+      setOrganizacoes(orgs);
+      setEventos(evs);
     } catch (error) {
       console.error('Error fetching data:', error);
       toast.error('Erro ao carregar dados do servidor');

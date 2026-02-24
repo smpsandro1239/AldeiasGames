@@ -17,7 +17,6 @@ import {
   Bell,
   Wallet
 } from 'lucide-react';
-import { Toaster } from 'sonner';
 
 // Custom Hooks
 import { useAuthLogic } from '@/hooks/use-auth-logic';
@@ -37,6 +36,7 @@ import { LoadingScreen } from '@/components/LoadingScreen';
 import { AdminDashboardView } from '@/features/AdminDashboardView';
 import { VendedorDashboardView } from '@/features/VendedorDashboardView';
 import { OrganizacaoDashboardView } from '@/features/OrganizacaoDashboardView';
+import { NotificacoesModal } from '@/components/notificacoes-modal';
 import { ClienteDashboardView } from '@/features/ClienteDashboardView';
 import { CRMAdminView } from '@/features/CRMAdminView';
 
@@ -59,6 +59,7 @@ export default function AldeiasGames() {
   const { user, loading: authLoading, setUser, logout } = useAuthLogic();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isSidebarOpen, setSidebarOpen] = useState(false);
+  const [showNotificacoes, setShowNotificacoes] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   const { stats, refresh: refreshStats } = useDashboardData(user);
@@ -164,7 +165,6 @@ export default function AldeiasGames() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col font-sans text-gray-900">
-      <Toaster position="top-right" richColors closeButton />
       <CookieBanner />
       <LegalCompliance />
       <header className="sticky top-0 z-40 w-full bg-white/80 backdrop-blur-md border-b border-gray-200 shadow-sm">
@@ -184,7 +184,7 @@ export default function AldeiasGames() {
           <div className="flex items-center gap-2">
             {user ? (
               <>
-                <button className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg relative">
+                <button className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg relative" onClick={() => setShowNotificacoes(true)}>
                   <Bell className="w-5 h-5" />
                   {unreadCount > 0 && <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[10px] flex items-center justify-center rounded-full border-2 border-white">{unreadCount}</span>}
                 </button>

@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const loginSchema = z.object({
   email: z.string().email('Email inválido'),
-  password: z.string().min(6, 'A password deve ter pelo menos 6 caracteres'),
+  password: z.string().min(8, 'A password deve ter pelo menos 8 caracteres'),
 });
 
 export const participacaoSchema = z.object({
@@ -92,4 +92,11 @@ export const notificacaoSchema = z.object({
 export const sorteioSchema = z.object({
   jogoId: z.string().min(1),
   seed: z.string().min(32),
+});
+
+export const registerSchema = z.object({
+  nome: z.string().min(2, 'O nome deve ter pelo menos 2 caracteres'),
+  email: z.string().email('Email inválido'),
+  password: z.string().min(8, 'A password deve ter pelo menos 8 caracteres'),
+  telefone: z.string().optional(),
 });

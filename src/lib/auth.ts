@@ -14,7 +14,13 @@ if (!JWT_SECRET) {
   }
 }
 
-const SECRET = new TextEncoder().encode(JWT_SECRET || 'dev-secret-key-insecure-only-for-local-development');
+if (!JWT_SECRET && process.env.NODE_ENV === 'production') {
+  throw new Error('JWT_SECRET é obrigatório em producao. Define no ficheiro .env');
+}
+
+const SECRET = new TextEncoder().encode(
+  JWT_SECRET || 'dev-secret-placeholder-NUNCA-usar-em-producao-12345'
+);
 
 export interface UserPayload {
   id: string;

@@ -21,7 +21,7 @@ export async function GET(request: Request) {
             aldeia: {
               select: { 
                 id: true, nome: true, tipoOrganizacao: true,
-                autorizacaoCM: true, dataAutorizacaoCM: true,
+                autorizacaoCM: true, 
                 numeroAlvara: true, responsavel: true
               }
             }

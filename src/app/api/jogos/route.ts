@@ -34,3 +34,14 @@ export async function GET(request: Request) {
       skip: paginacao.skip,
       take: paginacao.limite,
     });
+    const jogosProcessados = jogos.map(jogo => ({
+      ...jogo,
+      premiosRaspadinha: jogo.premiosRaspadinha ? JSON.parse(jogo.premiosRaspadinha) : null,
+    }));
+
+    return respostaPaginada(jogosProcessados, total, paginacao);
+  } catch (error) {
+    console.error("Erro ao buscar jogos:", error);
+    return NextResponse.json({ error: "Erro ao buscar jogos" }, { status: 500 });
+  }
+}

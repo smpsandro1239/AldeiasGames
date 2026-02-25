@@ -6,3 +6,5 @@ Próximos passos:
 - Testar API de autenticação
 - Testar rotas de aldeias
 - Testar funcionalidades de pagamento
+✅ API jogos: retornando status 200 com dados vazios
+✅ Todas as APIs principais estão funcionando

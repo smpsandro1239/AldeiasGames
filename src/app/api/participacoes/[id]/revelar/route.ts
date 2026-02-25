@@ -13,7 +13,7 @@ function verifyHash(seed: string, premio: any, cardNumber: number, hash: string)
 // POST - Reveal raspadinha result
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await getUserFromRequest(request);
@@ -25,14 +25,14 @@ export async function POST(
       );
     }
 
-    const participacaoId = params.id;
+    const { id } = await context.params;
 
     // Get participation with raspadinha data
     const participacaoData = await db.$queryRaw<any[]>`
       SELECT p.*, j.tipo, j.premiosRaspadinha, j.stockInicial
       FROM participacoes p
       JOIN jogos j ON p.jogoId = j.id
-      WHERE p.id = ${participacaoId}
+      WHERE p.id = ${id}
     `;
 
     if (!participacaoData || participacaoData.length === 0) {
@@ -83,7 +83,7 @@ export async function POST(
     if (resultado && seed && hash) {
       const isValid = verifyHash(seed, resultado.premio, resultado.cardNumber, hash);
       if (!isValid) {
-        console.error('Hash verification failed for participacao:', participacaoId);
+        console.error('Hash verification failed for participacao:', id);
         return NextResponse.json(
           { error: 'Erro de integridade do cartão' },
           { status: 500 }
@@ -93,9 +93,9 @@ export async function POST(
 
     // Mark as revealed
     await db.$executeRaw`
-      UPDATE participacoes 
+      UPDATE participacoes
       SET revelado = 1, reveladoAt = datetime('now')
-      WHERE id = ${participacaoId}
+      WHERE id = ${id}
     `;
 
     // Get premio details for display
@@ -111,7 +111,7 @@ export async function POST(
             titulo: '🎉 Parabéns! Ganhou um prémio!',
             mensagem: `Ganhou ${premio.nome} no valor de ${premio.valor}€ na Raspadinha!`,
             dados: JSON.stringify({
-              participacaoId,
+              participacaoId: id,
               premio,
               cardNumber: resultado.cardNumber
             })
@@ -149,7 +149,7 @@ export async function POST(
 // GET - Verify raspadinha integrity
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await getUserFromRequest(request);
@@ -161,7 +161,7 @@ export async function GET(
       );
     }
 
-    const participacaoId = params.id;
+    const { id } = await context.params;
 
     // Get participation with raspadinha data
     const participacaoData = await db.$queryRaw<any[]>`
@@ -169,7 +169,7 @@ export async function GET(
              j.tipo, j.premiosRaspadinha
       FROM participacoes p
       JOIN jogos j ON p.jogoId = j.id
-      WHERE p.id = ${participacaoId}
+      WHERE p.id = ${id}
     `;
 
     if (!participacaoData || participacaoData.length === 0) {

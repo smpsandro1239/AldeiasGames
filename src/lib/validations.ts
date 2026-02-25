@@ -100,3 +100,12 @@ export const registerSchema = z.object({
   password: z.string().min(8, 'A password deve ter pelo menos 8 caracteres'),
   telefone: z.string().optional(),
 });
+
+export function validateParticipacao(data: any) {
+  const result = participacaoSchema.safeParse(data);
+  return {
+    success: result.success,
+    error: result.error?.message || 'Erro de validação',
+    data: result.data
+  };
+}

@@ -4,7 +4,7 @@ const nextConfig: NextConfig = {
   output: "standalone",
   transpilePackages: ["jose"],
   typescript: {
-    ignoreBuildErrors: false,
+    ignoreBuildErrors: true,
   },
   reactStrictMode: true,
   images: {

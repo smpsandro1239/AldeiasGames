@@ -1,6 +1,5 @@
 import React from 'react';
-import { Button } from '@/components/ui/card'; // Wait, Button is usually in components/ui/button
-import { Button as UIButton } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
 import {
   Globe, Ticket, Shield, ShoppingBag, Bell, Moon, Sun, User, History, LogOut, Menu
 } from 'lucide-react';
@@ -51,60 +50,60 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         <nav className="hidden md:flex items-center gap-1">
-          <UIButton
+          <Button
             variant={activeView === 'public' ? 'default' : 'ghost'}
             onClick={() => setActiveView('public')}
             className="gap-2"
           >
             <Globe className="h-4 w-4" />
             Jogos
-          </UIButton>
-          <UIButton
+          </Button>
+          <Button
             variant={activeView === 'my-games' ? 'default' : 'ghost'}
             onClick={() => setActiveView('my-games')}
             className="gap-2"
           >
             <Ticket className="h-4 w-4" />
             Meus Jogos
-          </UIButton>
+          </Button>
           {user && ['super_admin', 'aldeia_admin'].includes(user.role) && (
-            <UIButton
+            <Button
               variant={activeView === 'admin' ? 'default' : 'ghost'}
               onClick={() => setActiveView('admin')}
               className="gap-2"
             >
               <Shield className="h-4 w-4" />
               Admin
-            </UIButton>
+            </Button>
           )}
           {user?.role === 'vendedor' && (
-            <UIButton
+            <Button
               variant={activeView === 'vendedor' ? 'default' : 'ghost'}
               onClick={() => setActiveView('vendedor')}
               className="gap-2"
             >
               <ShoppingBag className="h-4 w-4" />
               Vendas
-            </UIButton>
+            </Button>
           )}
         </nav>
 
         <div className="flex items-center gap-2">
           {/* Theme Toggle */}
-          <UIButton
+          <Button
             variant="ghost"
             size="icon"
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
             className="rounded-full"
           >
             {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-          </UIButton>
+          </Button>
 
           {user ? (
             <>
               {/* Notifications */}
               <div className="relative">
-                <UIButton
+                <Button
                   variant="ghost"
                   size="icon"
                   className="rounded-full"
@@ -116,11 +115,11 @@ export const Header: React.FC<HeaderProps> = ({
                       {notificacoesNaoLidas}
                     </Badge>
                   )}
-                </UIButton>
+                </Button>
               </div>
 
               {/* History */}
-              <UIButton
+              <Button
                 variant="ghost"
                 size="icon"
                 className="rounded-full"
@@ -128,10 +127,10 @@ export const Header: React.FC<HeaderProps> = ({
                 title="Histórico de Pagamentos"
               >
                 <History className="h-5 w-5" />
-              </UIButton>
+              </Button>
 
               {/* Profile */}
-              <UIButton
+              <Button
                 variant="ghost"
                 size="icon"
                 className="rounded-full"
@@ -139,10 +138,10 @@ export const Header: React.FC<HeaderProps> = ({
                 title="Perfil"
               >
                 <User className="h-5 w-5" />
-              </UIButton>
+              </Button>
 
               {/* Logout */}
-              <UIButton
+              <Button
                 variant="ghost"
                 size="icon"
                 className="rounded-full text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20"
@@ -150,24 +149,24 @@ export const Header: React.FC<HeaderProps> = ({
                 title="Sair"
               >
                 <LogOut className="h-5 w-5" />
-              </UIButton>
+              </Button>
             </>
           ) : (
-            <UIButton onClick={() => setAuthModalOpen(true)} className="gap-2 bg-green-600 hover:bg-green-700">
+            <Button onClick={() => setAuthModalOpen(true)} className="gap-2 bg-green-600 hover:bg-green-700">
               <User className="h-4 w-4" />
               <span>Entrar</span>
-            </UIButton>
+            </Button>
           )}
 
           {/* Mobile Menu Toggle */}
-          <UIButton
+          <Button
             variant="ghost"
             size="icon"
             className="md:hidden rounded-full"
             onClick={() => setSidebarOpen(true)}
           >
             <Menu className="h-5 w-5" />
-          </UIButton>
+          </Button>
         </div>
       </div>
     </header>

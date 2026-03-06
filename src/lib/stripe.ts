@@ -3,7 +3,7 @@ import Stripe from 'stripe';
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 
 if (!STRIPE_SECRET_KEY && process.env.NODE_ENV === 'production') {
-  throw new Error('STRIPE_SECRET_KEY é obrigatório em produção. Configura a variável de ambiente.');
+  console.error('CRITICAL: STRIPE_SECRET_KEY is missing in production!');
 }
 
 export const stripe = STRIPE_SECRET_KEY

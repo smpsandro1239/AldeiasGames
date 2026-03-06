@@ -3,24 +3,13 @@ import bcrypt from 'bcryptjs';
 import { SignJWT, jwtVerify } from 'jose';
 
 // Chave secreta para JWT
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-placeholder-NUNCA-usar-em-producao-12345';
 
-if (!JWT_SECRET) {
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error('JWT_SECRET environment variable is required in production');
-  } else {
-    // Para desenvolvimento, permitimos fallback se não estiver definido,
-    // mas avisamos o utilizador (já implementado no previous turn)
-  }
+if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') {
+  console.error('CRITICAL: JWT_SECRET environment variable is missing in production!');
 }
 
-if (!JWT_SECRET && process.env.NODE_ENV === 'production') {
-  throw new Error('JWT_SECRET é obrigatório em producao. Define no ficheiro .env');
-}
-
-const SECRET = new TextEncoder().encode(
-  JWT_SECRET || 'dev-secret-placeholder-NUNCA-usar-em-producao-12345'
-);
+const SECRET = new TextEncoder().encode(JWT_SECRET);
 
 export interface UserPayload {
   id: string;

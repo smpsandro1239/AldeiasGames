@@ -51,7 +51,7 @@ export async function POST(request: Request) {
       token,
     });
   } catch (error) {
-    if (error instanceof ZodError) {
+    if (error instanceof ZodError && error.errors && error.errors.length > 0) {
       return NextResponse.json(
         { error: error.errors[0].message },
         { status: 400 }

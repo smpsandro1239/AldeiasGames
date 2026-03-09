@@ -105,7 +105,7 @@ export async function POST(request: Request) {
     return NextResponse.json(aldeia, { status: 201 });
   } catch (error) {
     if (error instanceof ZodError) {
-      return NextResponse.json({ error: error.errors[0].message }, { status: 400 });
+      return NextResponse.json({ error: error.issues[0].message }, { status: 400 });
     }
     console.error('Erro ao criar organização:', error);
     return NextResponse.json({ error: 'Erro ao criar organização' }, { status: 500 });

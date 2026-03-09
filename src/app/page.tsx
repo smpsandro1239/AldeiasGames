@@ -18,7 +18,7 @@ import {
   Wallet,
   Crown,
   Building2,
-  User
+  User as UserIcon
 } from 'lucide-react';
 
 // Custom Hooks

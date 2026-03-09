@@ -61,7 +61,7 @@ export async function PATCH(
     const evento = await db.evento.update({
       where: { id },
       data: {
-        nome,
+        titulo: nome,
         descricao,
         dataInicio: dataInicio ? new Date(dataInicio) : undefined,
         dataFim: dataFim ? new Date(dataFim) : undefined,

@@ -26,7 +26,7 @@ export async function POST(request: Request) {
         data: {
           email,
           nome: getDevNameByRole(role),
-          password: 'dev-login-hash', // Não é usado para login real
+          passwordHash: 'dev-login-hash', // Não é usado para login real
           role,
         },
         include: { aldeia: true },
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     // Atualizar último login
     try {
       await db.user.update({
-        where: { id: user.id },
+        where: { id: user!.id },
         data: { ultimoLogin: new Date() }
       });
     } catch (e) {
@@ -44,21 +44,21 @@ export async function POST(request: Request) {
     }
 
     const token = await createToken({
-      id: user.id,
-      email: user.email,
-      nome: user.nome,
-      role: user.role,
-      aldeiaId: user.aldeiaId || undefined,
+      id: user!.id,
+      email: user!.email,
+      nome: user!.nome,
+      role: user!.role,
+      aldeiaId: user!.aldeiaId || undefined,
     });
 
     return NextResponse.json({
       user: {
-        id: user.id,
-        nome: user.nome,
-        email: user.email,
-        role: user.role,
-        aldeiaId: user.aldeiaId,
-        aldeia: user.aldeia,
+        id: user!.id,
+        nome: user!.nome,
+        email: user!.email,
+        role: user!.role,
+        aldeiaId: user!.aldeiaId,
+        aldeia: user!.aldeia,
       },
       token,
     });

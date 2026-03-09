@@ -101,7 +101,7 @@ export function OrganizacaoPremiosView({ aldeiaId }: OrganizacaoPremiosViewProps
       valorEstimado: premio.valorEstimado || 0,
       patrocinador: premio.patrocinador || '',
       ordem: premio.ordem || 0,
-      ativo: premio.ativo
+      ativo: premio.ativo ?? true
     });
     setIsDialogOpen(true);
   };

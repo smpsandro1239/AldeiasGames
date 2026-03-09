@@ -456,7 +456,7 @@ export const CreateModal = ({
                                   <div className="mt-3 space-y-2">
                                     <p className="text-xs font-medium">Prémios configurados:</p>
                                     <div className="max-h-40 overflow-y-auto space-y-1">
-                                      {premiosRaspadinha.map((p, i) => (
+                                      {premiosRaspadinha.map((p: any, i: any) => (
                                         <div key={i} className="flex items-center justify-between bg-white/50 p-2 rounded text-xs">
                                           <span>{p.nome} ({p.percentagem}%)</span>
                                           <div className="flex items-center gap-2">

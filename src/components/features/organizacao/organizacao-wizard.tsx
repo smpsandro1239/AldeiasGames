@@ -95,7 +95,7 @@ export function OrganizacaoWizard({ organizacao, onComplete }: OrganizacaoWizard
               <label className="block text-sm font-medium mb-1">Nome da Organização *</label>
               <UIInput 
                 value={formData.nome}
-                onChange={(e) => setFormData({...formData, nome: e.target.value})}
+                onChange={(e: any) => setFormData({...formData, nome: e.target.value})}
                 placeholder="Ex: Junta de Freguesia de Aldeia Velha"
               />
             </div>
@@ -105,7 +105,7 @@ export function OrganizacaoWizard({ organizacao, onComplete }: OrganizacaoWizard
               <select 
                 className="w-full p-2 border rounded-lg"
                 value={formData.tipoOrganizacao}
-                onChange={(e) => setFormData({...formData, tipoOrganizacao: e.target.value})}
+                onChange={(e: any) => setFormData({...formData, tipoOrganizacao: e.target.value})}
               >
                 {TIPOS_ORGANIZACAO.map(t => (
                   <option key={t.value} value={t.value}>{t.label}</option>
@@ -119,7 +119,7 @@ export function OrganizacaoWizard({ organizacao, onComplete }: OrganizacaoWizard
                 className="w-full p-2 border rounded-lg"
                 rows={3}
                 value={formData.descricao}
-                onChange={(e) => setFormData({...formData, descricao: e.target.value})}
+                onChange={(e: any) => setFormData({...formData, descricao: e.target.value})}
                 placeholder="Descreva brevemente a organização..."
               />
             </div>
@@ -131,7 +131,7 @@ export function OrganizacaoWizard({ organizacao, onComplete }: OrganizacaoWizard
                   <label className="block text-sm font-medium mb-1">Nome da Escola</label>
                   <UIInput 
                     value={formData.nomeEscola}
-                    onChange={(e) => setFormData({...formData, nomeEscola: e.target.value})}
+                    onChange={(e: any) => setFormData({...formData, nomeEscola: e.target.value})}
                     placeholder="Ex: Escola Básica de Aldeia Velha"
                   />
                 </div>
@@ -139,7 +139,7 @@ export function OrganizacaoWizard({ organizacao, onComplete }: OrganizacaoWizard
                   <label className="block text-sm font-medium mb-1">Código da Escola</label>
                   <UIInput 
                     value={formData.codigoEscola}
-                    onChange={(e) => setFormData({...formData, codigoEscola: e.target.value})}
+                    onChange={(e: any) => setFormData({...formData, codigoEscola: e.target.value})}
                     placeholder="Ex: 123456"
                   />
                 </div>
@@ -147,7 +147,7 @@ export function OrganizacaoWizard({ organizacao, onComplete }: OrganizacaoWizard
                   <label className="block text-sm font-medium mb-1">Nível de Ensino</label>
                   <UIInput 
                     value={formData.nivelEnsino}
-                    onChange={(e) => setFormData({...formData, nivelEnsino: e.target.value})}
+                    onChange={(e: any) => setFormData({...formData, nivelEnsino: e.target.value})}
                     placeholder="Ex: 1º Ciclo, 2º/3º Ciclo..."
                   />
                 </div>
@@ -165,7 +165,7 @@ export function OrganizacaoWizard({ organizacao, onComplete }: OrganizacaoWizard
               <label className="block text-sm font-medium mb-1">Morada *</label>
               <UIInput 
                 value={formData.morada}
-                onChange={(e) => setFormData({...formData, morada: e.target.value})}
+                onChange={(e: any) => setFormData({...formData, morada: e.target.value})}
                 placeholder="Rua, número, andar..."
               />
             </div>
@@ -175,7 +175,7 @@ export function OrganizacaoWizard({ organizacao, onComplete }: OrganizacaoWizard
                 <label className="block text-sm font-medium mb-1">Código Postal *</label>
                 <UIInput 
                   value={formData.codigoPostal}
-                  onChange={(e) => setFormData({...formData, codigoPostal: e.target.value})}
+                  onChange={(e: any) => setFormData({...formData, codigoPostal: e.target.value})}
                   placeholder="0000-000"
                 />
               </div>
@@ -183,7 +183,7 @@ export function OrganizacaoWizard({ organizacao, onComplete }: OrganizacaoWizard
                 <label className="block text-sm font-medium mb-1">Localidade *</label>
                 <UIInput 
                   value={formData.locality}
-                  onChange={(e) => setFormData({...formData, locality: e.target.value})}
+                  onChange={(e: any) => setFormData({...formData, locality: e.target.value})}
                   placeholder="Cidade/Vila"
                 />
               </div>
@@ -200,7 +200,7 @@ export function OrganizacaoWizard({ organizacao, onComplete }: OrganizacaoWizard
               <label className="block text-sm font-medium mb-1">Responsável pela Organização *</label>
               <UIInput 
                 value={formData.responsavel}
-                onChange={(e) => setFormData({...formData, responsavel: e.target.value})}
+                onChange={(e: any) => setFormData({...formData, responsavel: e.target.value})}
                 placeholder="Nome do responsável"
               />
             </div>
@@ -209,7 +209,7 @@ export function OrganizacaoWizard({ organizacao, onComplete }: OrganizacaoWizard
               <label className="block text-sm font-medium mb-1">Contacto do Responsável *</label>
               <UIInput 
                 value={formData.contactoResponsavel}
-                onChange={(e) => setFormData({...formData, contactoResponsavel: e.target.value})}
+                onChange={(e: any) => setFormData({...formData, contactoResponsavel: e.target.value})}
                 placeholder="Telefone ou email"
               />
             </div>
@@ -218,7 +218,7 @@ export function OrganizacaoWizard({ organizacao, onComplete }: OrganizacaoWizard
               <label className="block text-sm font-medium mb-1">Número de Alvará (se aplicável)</label>
               <UIInput 
                 value={formData.numeroAlvara}
-                onChange={(e) => setFormData({...formData, numeroAlvara: e.target.value})}
+                onChange={(e: any) => setFormData({...formData, numeroAlvara: e.target.value})}
                 placeholder="Número do alvará judicial"
               />
             </div>
@@ -228,7 +228,7 @@ export function OrganizacaoWizard({ organizacao, onComplete }: OrganizacaoWizard
                 <input 
                   type="checkbox"
                   checked={formData.autorizacaoCM}
-                  onChange={(e) => setFormData({...formData, autorizacaoCM: e.target.checked})}
+                  onChange={(e: any) => setFormData({...formData, autorizacaoCM: e.target.checked})}
                   className="mt-1"
                 />
                 <div>

@@ -30,9 +30,13 @@
 - [ ] 2.5 Vendedor: Sincronização Online/Offline
 
 ### Fase 3: Cliente & Utilizador
-- [ ] 3.1 Cliente: Perfil do Utilizador
-- [ ] 3.2 Cliente: Notificações
-- [ ] 3.3 Cliente: Histórico de Prémios
+- [x] 3.1 Cliente: Perfil do Utilizador
+  - API: `/api/users/perfil` ✅
+  - Componente: `cliente-perfil.tsx` ✅
+- [x] 3.2 Cliente: Notificações (já existe API e UI)
+- [x] 3.3 Cliente: Histórico de Prémios
+  - API: `/api/premios/historico` ✅
+  - Componente: `cliente-historico-premios.tsx` ✅
 - [ ] 3.4 Cliente: Carrinho de Compras
 
 ### Fase 4: Infraestrutura

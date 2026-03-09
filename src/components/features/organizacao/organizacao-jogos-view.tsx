@@ -113,9 +113,10 @@ export function OrganizacaoJogosView({ aldeiaId }: OrganizacaoJogosViewProps) {
       precoParticipacao: jogo.precoParticipacao,
       stockInicial: jogo.stockInicial || 100,
       limitePorUsuario: jogo.limitePorUsuario || 5,
-      premiosRaspadinha: typeof jogo.premiosRaspadinha === 'string' ? jogo.premiosRaspadinha : JSON.stringify(jogo.premiosRaspadinha setIsDialogOpen)
+      premiosRaspadinha: typeof jogo.premiosRaspadinha === 'string' ? jogo.premiosRaspadinha : JSON.stringify(jogo.premiosRaspadinha)
     });
-   (true);
+    setIsDialogOpen(true);
+    setIsEditing(true);
   };
 
   const handleEliminar = async (id: string) => {

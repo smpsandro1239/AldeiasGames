@@ -18,16 +18,16 @@
   - UI: `organizacao-premios-view.tsx` ✅
 
 ### Fase 2: Vendedor & Vendas
-- [ ] 2.1 Vendedor: Scanner QR Code
-- [ ] 2.2 Vendedor: Comprovativos de Venda
-- [ ] 2.3 Vendedor: Registo de Cliente
-- [ ] 2.4 Vendedor: Sincronização Online/Offline
-
-### Fase 2: Vendedor & Vendas
-- [ ] 2.1 Vendedor: Scanner QR Code
-- [ ] 2.2 Vendedor: Comprovativos de Venda
-- [ ] 2.3 Vendedor: Registo de Cliente
-- [ ] 2.4 Vendedor: Sincronização Online/Offline
+- [x] 2.1 Vendedor: Scanner QR Code
+  - Componente: `vendedor-scanner.tsx` ✅
+  - API: `/api/vendedor/validar-qr` ✅
+- [x] 2.2 Vendedor: Comprovativos de Venda
+  - API: `/api/vendas`, `/api/vendas/[id]` ✅
+  - Componente: `comprovativo-venda.tsx` ✅
+- [x] 2.3 Vendedor: Registo de Cliente
+  - API: `/api/clientes` ✅
+- [x] 2.4 Vendedor: Nova Venda Direta (integrada no Dashboard)
+- [ ] 2.5 Vendedor: Sincronização Online/Offline
 
 ### Fase 3: Cliente & Utilizador
 - [ ] 3.1 Cliente: Perfil do Utilizador

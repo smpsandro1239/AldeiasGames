@@ -17,7 +17,22 @@ import {
   GripVertical
 } from 'lucide-react';
 import { UIButton, UICard, UIBadge, UIDialog, UIInput, UITextarea } from '@/components/ui-components';
-import { Premio } from '@/types/project';
+
+// Local Premio interface
+interface Premio {
+  id: string;
+  nome: string;
+  descricao?: string;
+  valor: number;
+  valorEstimado?: number;
+  quantidade: number;
+  entregue: number;
+  estado: 'disponivel' | 'esgotado';
+  patrocinador?: string;
+  ordem?: number;
+  ativo?: boolean;
+  imagemUrl?: string;
+}
 
 interface OrganizacaoPremiosViewProps {
   aldeiaId: string;

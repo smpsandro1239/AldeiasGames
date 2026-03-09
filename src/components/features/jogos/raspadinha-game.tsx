@@ -19,8 +19,7 @@ import {
   Volume2,
   VolumeX,
   CheckCircle,
-  XCircle,
-  Confetti
+  XCircle
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { UIButton } from '@/components/ui-components';

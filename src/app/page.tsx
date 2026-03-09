@@ -15,7 +15,10 @@ import {
   Search,
   LogOut,
   Bell,
-  Wallet
+  Wallet,
+  Crown,
+  Building2,
+  User
 } from 'lucide-react';
 
 // Custom Hooks
@@ -77,6 +80,40 @@ export default function AldeiasGames() {
   });
   const { exportToExcel } = useReports();
 
+  const [loginAsLoading, setLoginAsLoading] = useState<string | null>(null);
+
+  const loginAs = async (email: string, role: string) => {
+    setLoginAsLoading(role);
+    try {
+      const res = await fetch('/api/auth/dev-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, role }),
+      });
+      const data = await res.json();
+      if (data.token) {
+        localStorage.setItem('token', data.token);
+        setUser(data.user);
+      } else {
+        // Fallback: criar utilizador mock para desenvolvimento
+        const mockUser = {
+          id: `dev-${role}`,
+          nome: `Dev ${role.replace('_', ' ')}`,
+          email: email,
+          role: role,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        localStorage.setItem('token', 'dev-token');
+        setUser(mockUser);
+      }
+    } catch (err) {
+      console.error('Login error:', err);
+    } finally {
+      setLoginAsLoading(null);
+    }
+  };
+
   const [modals, setModals] = useState({
     auth: false,
     profile: false,
@@ -118,7 +155,64 @@ export default function AldeiasGames() {
           <Trophy className="w-20 h-20 text-indigo-600 mb-6 animate-bounce" />
           <h1 className="text-4xl font-extrabold text-gray-900 mb-4 tracking-tight">Bem-vindo ao Aldeias Games</h1>
           <p className="text-xl text-gray-600 mb-8 max-w-2xl">A plataforma definitiva para dinamização de eventos e raspadinhas digitais.</p>
-          <UIButton onClick={() => toggleModal('auth', true)} size="lg" className="px-8 py-6 text-lg">Começar Agora</UIButton>
+          
+          {/* Botões de Login Direto por Role */}
+          <div className="flex flex-wrap justify-center gap-4 mb-8">
+            <button
+              onClick={() => loginAs('admin@aldeias.pt', 'super_admin')}
+              disabled={loginAsLoading === 'super_admin'}
+              className="flex items-center gap-2 px-6 py-4 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white rounded-xl font-semibold shadow-lg transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loginAsLoading === 'super_admin' ? (
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Crown className="w-5 h-5" />
+              )}
+              Super Admin
+            </button>
+            
+            <button
+              onClick={() => loginAs('aldeia@gmail.com', 'aldeia_admin')}
+              disabled={loginAsLoading === 'aldeia_admin'}
+              className="flex items-center gap-2 px-6 py-4 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white rounded-xl font-semibold shadow-lg transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loginAsLoading === 'aldeia_admin' ? (
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Building2 className="w-5 h-5" />
+              )}
+              Admin Aldeia
+            </button>
+            
+            <button
+              onClick={() => loginAs('vendedor@gmail.com', 'vendedor')}
+              disabled={loginAsLoading === 'vendedor'}
+              className="flex items-center gap-2 px-6 py-4 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-xl font-semibold shadow-lg transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loginAsLoading === 'vendedor' ? (
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Users className="w-5 h-5" />
+              )}
+              Vendedor
+            </button>
+            
+            <button
+              onClick={() => loginAs('smpsandro1239@gmail.com', 'user')}
+              disabled={loginAsLoading === 'user'}
+              className="flex items-center gap-2 px-6 py-4 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-xl font-semibold shadow-lg transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loginAsLoading === 'user' ? (
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <User className="w-5 h-5" />
+              )}
+              Jogador
+            </button>
+          </div>
+          
+          <p className="text-sm text-gray-500 mb-4">Ou autentique-se normalmente:</p>
+          <UIButton onClick={() => toggleModal('auth', true)} size="lg" variant="outline" className="px-8 py-6 text-lg">Entrar / Registar</UIButton>
         </div>
       );
     }

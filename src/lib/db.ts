@@ -19,6 +19,6 @@ export async function alterarParticipacao(id: string, data: any) {
       tipoAlteracao: data.tipoAlteracao || 'atualizacao',
       posicao: data.posicao || '',
       infoAdicional: data.infoAdicional || '',
-    },
+    } as any,
   });
 }

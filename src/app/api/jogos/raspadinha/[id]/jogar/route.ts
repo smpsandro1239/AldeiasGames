@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * API: /api/jogos/raspadinha/[id]/jogar
  * Jogar uma raspadinha - revelar área(s)

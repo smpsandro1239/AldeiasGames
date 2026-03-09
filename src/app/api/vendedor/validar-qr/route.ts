@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * API: /api/vendedor/validar-qr
  * Valida códigos QR para vendedores

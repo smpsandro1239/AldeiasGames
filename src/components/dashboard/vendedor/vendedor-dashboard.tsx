@@ -34,10 +34,23 @@ import {
   WalletCards,
   Receipt,
   RefreshCw,
-  TrendingDown
+  TrendingDown,
+  LogOut
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { UIButton, UICard, UIBadge } from '@/components/ui-components';
+
+// ============================================
+// LOGOUT HANDLER
+// ============================================
+
+function handleLogout() {
+  document.cookie.split(";").forEach((c) => { 
+    document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+  });
+  localStorage.clear();
+  window.location.href = '/';
+}
 
 // ============================================
 // TIPOS
@@ -311,6 +324,13 @@ export function VendedorDashboard() {
                 <p className="text-xs text-gray-500">Comissão Hoje</p>
                 <p className="font-bold text-green-600">€{stats.comissaoHoje.toFixed(2)}</p>
               </div>
+              <button 
+                onClick={handleLogout}
+                className="p-2 hover:bg-red-50 rounded-xl text-red-600" 
+                title="Logout"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
               <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-full flex items-center justify-center text-white font-bold">
                 V
               </div>

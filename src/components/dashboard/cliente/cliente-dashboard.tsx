@@ -35,10 +35,23 @@ import {
   Copy,
   CheckCircle,
   RefreshCw,
-  Users
+  Users,
+  LogOut
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { UIButton, UICard, UIBadge } from '@/components/ui-components';
+
+// ============================================
+// LOGOUT HANDLER
+// ============================================
+
+function handleLogout() {
+  document.cookie.split(";").forEach((c) => { 
+    document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+  });
+  localStorage.clear();
+  window.location.href = '/';
+}
 
 // ============================================
 // TIPOS
@@ -350,6 +363,13 @@ export function ClienteDashboard() {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              <button 
+                onClick={handleLogout}
+                className="p-2 hover:bg-red-50 rounded-xl text-red-600" 
+                title="Logout"
+              >
+                <LogOut className="w-5 h-5" />
+              </button>
               <button onClick={() => setShowPerfil(true)} className="p-2 hover:bg-gray-100 rounded-xl relative">
                 <Bell className="w-5 h-5 text-gray-600" />
                 <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />

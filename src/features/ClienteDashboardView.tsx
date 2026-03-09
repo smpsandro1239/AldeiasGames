@@ -4,7 +4,7 @@ import { UIButton, UICard } from '@/components/ui-components';
 import { GameCard } from '@/components/ui/game-card';
 import { soundEngine } from '@/lib/audio-utils';
 import confetti from 'canvas-confetti';
-import { User, Evento, Participacao, Jogo } from '@/types/project';
+import { User, Evento, Participacao, Jogo } from '@/types/types';
 
 interface ClienteDashboardViewProps {
   user: User;

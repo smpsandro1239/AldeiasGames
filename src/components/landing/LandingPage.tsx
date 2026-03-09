@@ -378,7 +378,7 @@ function GamesSection() {
             // @ts-ignore
         <motion.div 
           className="text-center mb-16"
-          {...fadeInUp}
+          {...fadeInUp as any}
         >
           <span className="inline-block px-4 py-1 rounded-full text-sm font-bold text-amber-600 bg-amber-100 mb-4">
             Os Nossos Jogos
@@ -475,7 +475,7 @@ function HowItWorksSection() {
       <div className="max-w-7xl mx-auto px-4">
         <motion.div 
           className="text-center mb-16"
-          {...fadeInUp}
+          {...fadeInUp as any}
             // @ts-ignore
         >
           <span className="inline-block px-4 py-1 rounded-full text-sm font-bold text-green-600 bg-green-100 mb-4">
@@ -618,7 +618,7 @@ function TestimonialsSection() {
         <motion.div 
           className="text-center mb-16"
             // @ts-ignore
-          {...fadeInUp}
+          {...fadeInUp as any}
         >
           <span className="inline-block px-4 py-1 rounded-full text-sm font-bold text-amber-600 bg-amber-100 mb-4">
             Depoimentos

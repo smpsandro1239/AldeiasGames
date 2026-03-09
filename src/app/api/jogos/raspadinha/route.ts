@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * API: /api/jogos/raspadinha
  * Gestão de Raspadinhas

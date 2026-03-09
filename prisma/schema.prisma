@@ -28,6 +28,8 @@ model User {
   notificacoes         Notificacao[]
   pushSubscriptions    PushSubscription[]
   logsAcesso           LogAcesso[]
+  vendas               Venda[]                 @relation("VendaVendedor")
+  compras              Venda[]                 @relation("VendaCliente")
 
   @@map("utilizadores")
 }
@@ -52,6 +54,7 @@ model Aldeia {
   eventos             Evento[]
   users               User[]
   premios             Premio[]
+  vendas              Venda[]
 
   @@map("aldeias")
 }
@@ -182,19 +185,64 @@ model Premio {
   id            String   @id @default(cuid())
   aldeiaId      String
   nome          String
+  titulo        String?  // Novo campo para compatibilidade
   descricao     String?
+  valor         Float?   // Novo campo (valorEstimado pode ser usado)
   valorEstimado Float?
   imageUrl      String?
   imagemBase64  String?
   patrocinador  String?
   ordem         Int      @default(0)
   ativo         Boolean  @default(true)
+  estado        String   @default("disponivel") // disponivel, resgatado, expirado
+  codigo        String?  // Código único para QR
+  resgatadoPor  String?
+  dataResgate   DateTime?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   aldeia        Aldeia   @relation(fields: [aldeiaId], references: [id])
   jogos         Jogo[]
 
   @@map("premios")
+}
+
+model Venda {
+  id            String     @id @default(cuid())
+  aldeiaId      String
+  vendedorId    String
+  clienteId     String?
+  valorTotal    Float
+  metodoPagamento String   @default("mbway")
+  estado        String     @default("pendente") // pendente, pago, cancelado
+  referencia    String?
+  telefone      String?
+  observacoes   String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  aldeia        Aldeia     @relation(fields: [aldeiaId], references: [id])
+  vendedor      User       @relation("VendaVendedor", fields: [vendedorId], references: [id])
+  cliente       User?      @relation("VendaCliente", fields: [clienteId], references: [id])
+  itens         VendaItem[]
+
+  @@index([aldeiaId])
+  @@index([vendedorId])
+  @@map("vendas")
+}
+
+model VendaItem {
+  id          String   @id @default(cuid())
+  vendaId     String
+  tipo        String   // jogo, premio, outro
+  itemId      String?
+  descricao   String
+  quantidade  Int      @default(1)
+  precoUnitario Float
+  subtotal    Float
+  createdAt   DateTime @default(now())
+  venda       Venda    @relation(fields: [vendaId], references: [id])
+
+  @@index([vendaId])
+  @@map("venda_itens")
 }
 
 model LogAcesso {

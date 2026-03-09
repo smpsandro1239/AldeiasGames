@@ -36,7 +36,7 @@ export function RifaNumberSelector({
   onOccupiedClick?: (num: number) => void;
   isAdminOrVendedor?: boolean;
 }) {
-  const config = typeof jogo.config === 'string' ? JSON.parse(jogo.config) : jogo.config;
+  const config = typeof jogo.configuracao === 'string' ? JSON.parse(jogo.configuracao) : jogo.configuracao;
   const total = config.totalBilhetes || 100;
   const [pagina, setPagina] = useState(0);
   const numerosPorPagina = 50;

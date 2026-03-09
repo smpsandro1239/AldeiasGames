@@ -12,6 +12,7 @@ interface WizardModalProps {
   onClose: () => void;
   wizardStep: number;
   setWizardStep: (step: number) => void;
+  setWizardModalOpen: (open: boolean) => void;
   wizardData: any;
   setWizardData: (data: any) => void;
   wizardLoading: boolean;
@@ -25,6 +26,7 @@ export const WizardModal: React.FC<WizardModalProps> = ({
   onClose,
   wizardStep,
   setWizardStep,
+  setWizardModalOpen,
   wizardData,
   setWizardData,
   wizardLoading,

@@ -215,7 +215,7 @@ export function ClientePerfil({ userId }: ClientePerfilProps) {
               <label className="block text-sm font-medium mb-1">Nome</label>
               <UIInput
                 value={formData.nome}
-                onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
+                onChange={(e: any) => setFormData({ ...formData, nome: e.target.value })}
                 disabled={!editMode}
                 icon={<User className="w-4 h-4" />}
               />
@@ -235,7 +235,7 @@ export function ClientePerfil({ userId }: ClientePerfilProps) {
               <label className="block text-sm font-medium mb-1">Telemóvel</label>
               <UIInput
                 value={formData.telefone}
-                onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
+                onChange={(e: any) => setFormData({ ...formData, telefone: e.target.value })}
                 disabled={!editMode}
                 placeholder="912 345 678"
                 icon={<Phone className="w-4 h-4" />}
@@ -254,7 +254,7 @@ export function ClientePerfil({ userId }: ClientePerfilProps) {
                   <UIInput
                     type="password"
                     value={formData.passwordAtual}
-                    onChange={(e) => setFormData({ ...formData, passwordAtual: e.target.value })}
+                    onChange={(e: any) => setFormData({ ...formData, passwordAtual: e.target.value })}
                     placeholder="••••••••"
                   />
                 </div>
@@ -265,7 +265,7 @@ export function ClientePerfil({ userId }: ClientePerfilProps) {
                     <UIInput
                       type="password"
                       value={formData.novaPassword}
-                      onChange={(e) => setFormData({ ...formData, novaPassword: e.target.value })}
+                      onChange={(e: any) => setFormData({ ...formData, novaPassword: e.target.value })}
                       placeholder="••••••••"
                     />
                   </div>
@@ -274,7 +274,7 @@ export function ClientePerfil({ userId }: ClientePerfilProps) {
                     <UIInput
                       type="password"
                       value={formData.confirmarPassword}
-                      onChange={(e) => setFormData({ ...formData, confirmarPassword: e.target.value })}
+                      onChange={(e: any) => setFormData({ ...formData, confirmarPassword: e.target.value })}
                       placeholder="••••••••"
                     />
                   </div>

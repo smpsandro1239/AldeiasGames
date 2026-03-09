@@ -46,10 +46,23 @@ import {
   Star,
   Target,
   UsersRound,
-  Euro
+  Euro,
+  LogOut
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { UIButton, UICard, UIBadge } from '@/components/ui-components';
+
+// ============================================
+// LOGOUT HANDLER
+// ============================================
+
+function handleLogout() {
+  document.cookie.split(";").forEach((c) => { 
+    document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+  });
+  localStorage.clear();
+  window.location.href = '/';
+}
 
 // ============================================
 // TIPOS
@@ -409,6 +422,13 @@ export function AdminDashboard() {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              <button 
+                onClick={handleLogout}
+                className="p-3 hover:bg-red-50 rounded-xl text-red-600" 
+                title="Logout"
+              >
+                <LogOut className="w-5 h-5" />
+              </button>
               <button className="p-3 hover:bg-gray-100 rounded-xl relative">
                 <Bell className="w-5 h-5 text-gray-600" />
                 <span className="absolute top-1 right-1 w-3 h-3 bg-red-500 rounded-full" />

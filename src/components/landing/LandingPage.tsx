@@ -374,6 +374,7 @@ function GamesSection() {
   return (
     <section id="jogos" className="py-20 lg:py-32 bg-white">
       <div className="max-w-7xl mx-auto px-4">
+// @ts-ignore
         <motion.div 
           className="text-center mb-16"
           {...fadeInUp}

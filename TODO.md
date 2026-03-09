@@ -26,7 +26,10 @@
   - Componente: `comprovativo-venda.tsx` ✅
 - [x] 2.3 Vendedor: Registo de Cliente
   - API: `/api/clientes` ✅
-- [x] 2.4 Vendedor: Nova Venda Direta (integrada no Dashboard)
+- [x] 2.4 Vendedor: Terminal de Vendas (Tablet/Telemóvel)
+  - Componente: `terminal-vendas.tsx` ✅
+  - API: `/api/vendas/rapida` ✅
+  - Fluxo: Escolher Jogo → Registar Cliente → Pagamento → Confirmação ✅
 - [ ] 2.5 Vendedor: Sincronização Online/Offline
 
 ### Fase 3: Cliente & Utilizador

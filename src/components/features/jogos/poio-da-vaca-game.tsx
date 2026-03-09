@@ -64,7 +64,7 @@ const numberPick = {
     backgroundColor: ["#FFFFFF", "#EF4444", "#FFFFFF"],
     transition: { duration: 0.3 }
   }
-};
+} as const;
 
 const winnerReveal = {
   hidden: { opacity: 0, scale: 0.5 },
@@ -73,7 +73,7 @@ const winnerReveal = {
     scale: 1,
     transition: { type: "spring", stiffness: 200, damping: 15 }
   }
-};
+} as const;
 
 // ============================================
 // COMPONENTES
@@ -106,7 +106,7 @@ function NumberGrid({
           <motion.button
             key={num}
             layout
-            variants={numberPick}
+            variants={numberPick as any}
             initial="initial"
             animate={
               isCorrect ? "correct" : 
@@ -257,7 +257,7 @@ function ResultadoPoio({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
     >
       <motion.div
-        variants={winnerReveal}
+        variants={winnerReveal as any}
         initial="hidden"
         animate="visible"
         className="bg-white rounded-3xl p-8 max-w-md mx-4 text-center"

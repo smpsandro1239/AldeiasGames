@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   X, Loader2, Plus, MapPin, Calendar, Gamepad2, Upload, ImageIcon,
-  Trash2, Sparkles, AlertTriangle, Info, Trophy, LayoutGrid, Target
+  Trash2, Sparkles, AlertTriangle, Info, Trophy, LayoutGrid, Target, Building2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -110,7 +110,7 @@ export const CreateModal = ({
                                 { id: 'aldeia', label: 'Aldeia', icon: MapPin },
                                 { id: 'escola', label: 'Escola', icon: School },
                                 { id: 'associacao_pais', label: 'Assoc. Pais', icon: Users },
-                                { id: 'clube', label: 'Clube', icon: Building }
+                                { id: 'clube', label: 'Clube', icon: Building2 }
                               ].map((tipo) => (
                                 <Button
                                   key={tipo.id}

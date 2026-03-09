@@ -26,7 +26,7 @@ import {
   RefreshCw,
   Settings
 } from 'lucide-react';
-import { UIButton, UICard, UIInput } from '@/components/ui-components';
+import { UIButton, UICard } from '@/components/ui-components';
 
 // ============================================
 // TIPOS
@@ -158,10 +158,11 @@ function Passo1Dados({
         <label className="block text-sm font-medium text-gray-700 mb-1">
           Título *
         </label>
-        <UIInput
+        <input
+          className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none transition-colors"
           placeholder="Ex: Raspadinha da Festa 2026"
           value={config.titulo}
-          onChange={(e) => onChange({ ...config, titulo: e.target.value })}
+          onChange={(e: any) => onChange({ ...config, titulo: e.target.value })}
         />
       </div>
 
@@ -174,7 +175,7 @@ function Passo1Dados({
           rows={2}
           placeholder="Descrição opcional..."
           value={config.descricao}
-          onChange={(e) => onChange({ ...config, descricao: e.target.value })}
+          onChange={(e: any) => onChange({ ...config, descricao: e.target.value })}
         />
       </div>
 
@@ -185,14 +186,14 @@ function Passo1Dados({
           </label>
           <div className="relative">
             <Coins className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <UIInput
+            <input
               type="number"
               step="0.01"
               min="0.50"
               placeholder="1.00"
-              className="pl-10"
+              className="w-full pl-10 px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none"
               value={config.preco || ''}
-              onChange={(e) => onChange({ ...config, preco: parseFloat(e.target.value) || 0 })}
+              onChange={(e: any) => onChange({ ...config, preco: parseFloat(e.target.value) || 0 })}
             />
           </div>
         </div>
@@ -201,11 +202,12 @@ function Passo1Dados({
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Limite Participantes
           </label>
-          <UIInput
+          <input
             type="number"
             placeholder="Ilimitado"
+            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none"
             value={config.limiteParticipantes || ''}
-            onChange={(e) => onChange({ ...config, limiteParticipantes: parseInt(e.target.value) || undefined })}
+            onChange={(e: any) => onChange({ ...config, limiteParticipantes: parseInt(e.target.value) || undefined })}
           />
         </div>
       </div>
@@ -218,7 +220,7 @@ function Passo1Dados({
           type="datetime-local"
           className="w-full p-3 border rounded-xl"
           value={config.dataExpiracao || ''}
-          onChange={(e) => onChange({ ...config, dataExpiracao: e.target.value })}
+          onChange={(e: any) => onChange({ ...config, dataExpiracao: e.target.value })}
         />
       </div>
     </div>
@@ -309,29 +311,32 @@ function Passo2Premios({
               <div className="flex items-start gap-3">
                 <div className="flex-1 space-y-3">
                   <div className="grid grid-cols-2 gap-3">
-                    <UIInput
+                    <input
+                      className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none text-sm"
                       placeholder="Título do prémio"
                       value={premio.titulo}
-                      onChange={(e) => updatePremio(premio.id, { titulo: e.target.value })}
+                      onChange={(e: any) => updatePremio(premio.id, { titulo: e.target.value })}
                     />
-                    <UIInput
+                    <input
                       type="number"
                       step="0.01"
+                      className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none text-sm"
                       placeholder="Valor (€)"
                       value={premio.valor || ''}
-                      onChange={(e) => updatePremio(premio.id, { valor: parseFloat(e.target.value) || 0 })}
+                      onChange={(e: any) => updatePremio(premio.id, { valor: parseFloat(e.target.value) || 0 })}
                     />
                   </div>
                   
                   <div className="flex gap-3">
                     <div className="flex-1">
                       <label className="block text-xs text-gray-500 mb-1">Probabilidade %</label>
-                      <UIInput
+                      <input
                         type="number"
                         min="1"
                         max="100"
+                        className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none text-sm"
                         value={premio.probabilidade}
-                        onChange={(e) => updatePremio(premio.id, { probabilidade: parseInt(e.target.value) || 0 })}
+                        onChange={(e: any) => updatePremio(premio.id, { probabilidade: parseInt(e.target.value) || 0 })}
                       />
                     </div>
                     <div>

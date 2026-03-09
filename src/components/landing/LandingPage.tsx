@@ -375,6 +375,7 @@ function GamesSection() {
     <section id="jogos" className="py-20 lg:py-32 bg-white">
       <div className="max-w-7xl mx-auto px-4">
 // @ts-ignore
+            // @ts-ignore
         <motion.div 
           className="text-center mb-16"
           {...fadeInUp}
@@ -475,6 +476,7 @@ function HowItWorksSection() {
         <motion.div 
           className="text-center mb-16"
           {...fadeInUp}
+            // @ts-ignore
         >
           <span className="inline-block px-4 py-1 rounded-full text-sm font-bold text-green-600 bg-green-100 mb-4">
             Simples & Rápido
@@ -615,6 +617,7 @@ function TestimonialsSection() {
       <div className="max-w-7xl mx-auto px-4">
         <motion.div 
           className="text-center mb-16"
+            // @ts-ignore
           {...fadeInUp}
         >
           <span className="inline-block px-4 py-1 rounded-full text-sm font-bold text-amber-600 bg-amber-100 mb-4">

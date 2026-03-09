@@ -60,14 +60,14 @@ const ticketReveal = {
     rotate: 0,
     transition: { type: "spring", stiffness: 200, damping: 15 }
   }
-};
+} as const;
 
 const numberHighlight = {
   selected: {
     scale: 1.1,
     boxShadow: "0 0 30px rgba(234, 88, 12, 0.6)"
   }
-};
+} as const;
 
 // ============================================
 // COMPONENTES

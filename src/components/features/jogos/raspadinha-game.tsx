@@ -64,7 +64,7 @@ const scratchMotion = {
   initial: { scale: 0.8, opacity: 0 },
   animate: { scale: 1, opacity: 1 },
   exit: { scale: 0.8, opacity: 0 }
-};
+} as const;
 
 const victoryMotion = {
   initial: { scale: 0, rotate: -180 },
@@ -73,7 +73,7 @@ const victoryMotion = {
     rotate: 0,
     transition: { type: "spring", stiffness: 200, damping: 15 }
   }
-};
+} as const;
 
 const prizeReveal = {
   hidden: { opacity: 0, y: 50 },
@@ -82,7 +82,7 @@ const prizeReveal = {
     y: 0,
     transition: { delay: 0.5, duration: 0.5 }
   }
-};
+} as const;
 
 // ============================================
 // COMPONENTES

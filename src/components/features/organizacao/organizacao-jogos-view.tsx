@@ -45,6 +45,7 @@ export function OrganizacaoJogosView({ aldeiaId }: OrganizacaoJogosViewProps) {
   const [eventos, setEventos] = useState<Evento[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   const [editingJogo, setEditingJogo] = useState<Jogo | null>(null);
   const [formData, setFormData] = useState({
     eventoId: '',
@@ -253,7 +254,7 @@ export function OrganizacaoJogosView({ aldeiaId }: OrganizacaoJogosViewProps) {
       )}
 
       {/* Dialog de Criar/Editar Jogo */}
-      <UIDialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) resetForm(); }}>
+      <UIDialog open={isDialogOpen} onOpenChange={(open: any) => { setIsDialogOpen(open); if (!open) resetForm(); }}>
         <div className="p-6 space-y-4">
           <h2 className="text-xl font-bold">{editingJogo ? 'Editar Jogo' : 'Novo Jogo'}</h2>
           
@@ -263,7 +264,7 @@ export function OrganizacaoJogosView({ aldeiaId }: OrganizacaoJogosViewProps) {
               <select 
                 className="w-full p-2 border rounded-lg"
                 value={formData.eventoId}
-                onChange={(e) => setFormData({...formData, eventoId: e.target.value})}
+                onChange={(e: any) => setFormData({...formData, eventoId: e.target.value})}
               >
                 {eventos.map(ev => (
                   <option key={ev.id} value={ev.id}>{ev.nome}</option>
@@ -276,7 +277,7 @@ export function OrganizacaoJogosView({ aldeiaId }: OrganizacaoJogosViewProps) {
               <select 
                 className="w-full p-2 border rounded-lg"
                 value={formData.tipo}
-                onChange={(e) => setFormData({...formData, tipo: e.target.value})}
+                onChange={(e: any) => setFormData({...formData, tipo: e.target.value})}
               >
                 {TIPOS_JOGO.map(t => (
                   <option key={t.value} value={t.value}>{t.label}</option>
@@ -288,7 +289,7 @@ export function OrganizacaoJogosView({ aldeiaId }: OrganizacaoJogosViewProps) {
               <label className="block text-sm font-medium mb-1">Título *</label>
               <UIInput 
                 value={formData.titulo} 
-                onChange={(e) => setFormData({...formData, titulo: e.target.value})}
+                onChange={(e: any) => setFormData({...formData, titulo: e.target.value})}
                 placeholder="Ex: Raspadinha de São João 2026"
               />
             </div>
@@ -300,7 +301,7 @@ export function OrganizacaoJogosView({ aldeiaId }: OrganizacaoJogosViewProps) {
                   type="number"
                   step="0.01"
                   value={formData.precoParticipacao} 
-                  onChange={(e) => setFormData({...formData, precoParticipacao: parseFloat(e.target.value) || 0})}
+                  onChange={(e: any) => setFormData({...formData, precoParticipacao: parseFloat(e.target.value) || 0})}
                   placeholder="2.50"
                 />
               </div>
@@ -309,7 +310,7 @@ export function OrganizacaoJogosView({ aldeiaId }: OrganizacaoJogosViewProps) {
                 <UIInput 
                   type="number"
                   value={formData.stockInicial} 
-                  onChange={(e) => setFormData({...formData, stockInicial: parseInt(e.target.value) || 0})}
+                  onChange={(e: any) => setFormData({...formData, stockInicial: parseInt(e.target.value) || 0})}
                 />
               </div>
             </div>
@@ -319,7 +320,7 @@ export function OrganizacaoJogosView({ aldeiaId }: OrganizacaoJogosViewProps) {
               <UIInput 
                 type="number"
                 value={formData.limitePorUsuario} 
-                onChange={(e) => setFormData({...formData, limitePorUsuario: parseInt(e.target.value) || 0})}
+                onChange={(e: any) => setFormData({...formData, limitePorUsuario: parseInt(e.target.value) || 0})}
                 placeholder="5"
               />
             </div>
@@ -331,7 +332,7 @@ export function OrganizacaoJogosView({ aldeiaId }: OrganizacaoJogosViewProps) {
                   className="w-full p-2 border rounded-lg font-mono text-sm"
                   rows={4}
                   value={formData.premiosRaspadinha} 
-                  onChange={(e) => setFormData({...formData, premiosRaspadinha: e.target.value})}
+                  onChange={(e: any) => setFormData({...formData, premiosRaspadinha: e.target.value})}
                   placeholder='[{"posicao": 1, "nome": "1º Prémio", "valor": 100}, ...]'
                 />
               </div>

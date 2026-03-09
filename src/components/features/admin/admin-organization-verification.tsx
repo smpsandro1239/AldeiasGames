@@ -117,7 +117,7 @@ export function AdminOrganizationVerification({ onVerify }: AdminOrganizationVer
           <UIInput
             placeholder="Pesquisar organizações..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
             className="pl-10"
           />
         </div>

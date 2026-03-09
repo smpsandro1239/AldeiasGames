@@ -208,7 +208,7 @@ export function AdminPlanosView() {
       )}
 
       {/* Dialog de Criar/Editar */}
-      <UIDialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) resetForm(); }}>
+      <UIDialog open={isDialogOpen} onOpenChange={(open: boolean) => { setIsDialogOpen(open); if (!open) resetForm(); }}>
         <div className="p-6 space-y-4">
           <h2 className="text-xl font-bold">{editingPlano ? 'Editar Plano' : 'Novo Plano'}</h2>
           
@@ -217,7 +217,7 @@ export function AdminPlanosView() {
               <label className="block text-sm font-medium mb-1">Nome do Plano</label>
               <UIInput 
                 value={formData.nome} 
-                onChange={(e) => setFormData({...formData, nome: e.target.value})}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, nome: e.target.value})}
                 placeholder="Ex: Básico, Profissional, Enterprise"
               />
             </div>
@@ -227,7 +227,7 @@ export function AdminPlanosView() {
               <UIInput 
                 type="number"
                 value={formData.precoMensal} 
-                onChange={(e) => setFormData({...formData, precoMensal: parseFloat(e.target.value) || 0})}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, precoMensal: parseFloat(e.target.value) || 0})}
                 placeholder="0"
               />
             </div>
@@ -238,7 +238,7 @@ export function AdminPlanosView() {
                 <UIInput 
                   type="number"
                   value={formData.maxEventos} 
-                  onChange={(e) => setFormData({...formData, maxEventos: parseInt(e.target.value) || 0})}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, maxEventos: parseInt(e.target.value) || 0})}
                 />
               </div>
               <div>
@@ -246,7 +246,7 @@ export function AdminPlanosView() {
                 <UIInput 
                   type="number"
                   value={formData.maxJogos} 
-                  onChange={(e) => setFormData({...formData, maxJogos: parseInt(e.target.value) || 0})}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, maxJogos: parseInt(e.target.value) || 0})}
                 />
               </div>
               <div>
@@ -254,7 +254,7 @@ export function AdminPlanosView() {
                 <UIInput 
                   type="number"
                   value={formData.maxParticipacoes} 
-                  onChange={(e) => setFormData({...formData, maxParticipacoes: parseInt(e.target.value) || 0})}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, maxParticipacoes: parseInt(e.target.value) || 0})}
                 />
               </div>
             </div>
@@ -263,7 +263,7 @@ export function AdminPlanosView() {
               <label className="block text-sm font-medium mb-1">Descrição</label>
               <UITextarea 
                 value={formData.descricao} 
-                onChange={(e) => setFormData({...formData, descricao: e.target.value})}
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({...formData, descricao: e.target.value})}
                 placeholder="Descrição opcional do plano..."
                 rows={3}
               />

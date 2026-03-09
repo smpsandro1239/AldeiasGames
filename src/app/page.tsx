@@ -55,7 +55,7 @@ import { PricingModal } from '@/components/modals/PricingModal';
 import { RaspadinhaModal } from '@/components/modals/RaspadinhaModal';
 import { GerirParticipacaoModal } from '@/components/modals/GerirParticipacaoModal';
 
-import { User, Aldeia, Evento, Jogo, Participacao } from '@/types/project';
+import type { User, Aldeia, Evento, Jogo, Participacao } from '../types/types';
 
 export default function AldeiasGames() {
   const { user, loading: authLoading, setUser, logout } = useAuthLogic();

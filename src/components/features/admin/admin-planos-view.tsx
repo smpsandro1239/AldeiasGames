@@ -113,9 +113,8 @@ export function AdminPlanosView() {
       await fetch(`/api/planos/${plano.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ativo: !plano });
-      await carregarPlanos();
-   .ativo })
+        body: JSON.stringify({ ativo: !plano.ativo })
+      });
       } catch (error) {
       console.error('Erro ao atualizar plano:', error);
     }

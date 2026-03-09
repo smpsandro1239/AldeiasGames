@@ -223,7 +223,7 @@ export function OrganizacaoPremiosView({ aldeiaId }: OrganizacaoPremiosViewProps
       )}
 
       {/* Dialog de Criar/Editar Prémio */}
-      <UIDialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) resetForm(); }}>
+      <UIDialog open={isDialogOpen} onOpenChange={(open: any) => { setIsDialogOpen(open); if (!open) resetForm(); }}>
         <div className="p-6 space-y-4">
           <h2 className="text-xl font-bold">{editingPremio ? 'Editar Prémio' : 'Novo Prémio'}</h2>
           
@@ -232,7 +232,7 @@ export function OrganizacaoPremiosView({ aldeiaId }: OrganizacaoPremiosViewProps
               <label className="block text-sm font-medium mb-1">Nome do Prémio *</label>
               <UIInput 
                 value={formData.nome} 
-                onChange={(e) => setFormData({...formData, nome: e.target.value})}
+                onChange={(e: any) => setFormData({...formData, nome: e.target.value})}
                 placeholder="Ex: Smartwatch, Viagem, Cash..."
               />
             </div>
@@ -241,7 +241,7 @@ export function OrganizacaoPremiosView({ aldeiaId }: OrganizacaoPremiosViewProps
               <label className="block text-sm font-medium mb-1">Descrição</label>
               <UITextarea 
                 value={formData.descricao} 
-                onChange={(e) => setFormData({...formData, descricao: e.target.value})}
+                onChange={(e: any) => setFormData({...formData, descricao: e.target.value})}
                 placeholder="Descrição detalhada do prémio..."
                 rows={3}
               />
@@ -254,7 +254,7 @@ export function OrganizacaoPremiosView({ aldeiaId }: OrganizacaoPremiosViewProps
                   type="number"
                   step="0.01"
                   value={formData.valorEstimado} 
-                  onChange={(e) => setFormData({...formData, valorEstimado: parseFloat(e.target.value) || 0})}
+                  onChange={(e: any) => setFormData({...formData, valorEstimado: parseFloat(e.target.value) || 0})}
                   placeholder="0.00"
                 />
               </div>
@@ -263,7 +263,7 @@ export function OrganizacaoPremiosView({ aldeiaId }: OrganizacaoPremiosViewProps
                 <UIInput 
                   type="number"
                   value={formData.ordem} 
-                  onChange={(e) => setFormData({...formData, ordem: parseInt(e.target.value) || 0})}
+                  onChange={(e: any) => setFormData({...formData, ordem: parseInt(e.target.value) || 0})}
                 />
               </div>
             </div>
@@ -272,7 +272,7 @@ export function OrganizacaoPremiosView({ aldeiaId }: OrganizacaoPremiosViewProps
               <label className="block text-sm font-medium mb-1">Patrocinador</label>
               <UIInput 
                 value={formData.patrocinador} 
-                onChange={(e) => setFormData({...formData, patrocinador: e.target.value})}
+                onChange={(e: any) => setFormData({...formData, patrocinador: e.target.value})}
                 placeholder="Nome do patrocinador (opcional)"
               />
             </div>
@@ -282,7 +282,7 @@ export function OrganizacaoPremiosView({ aldeiaId }: OrganizacaoPremiosViewProps
                 type="checkbox"
                 id="ativo"
                 checked={formData.ativo}
-                onChange={(e) => setFormData({...formData, ativo: e.target.checked})}
+                onChange={(e: any) => setFormData({...formData, ativo: e.target.checked})}
                 className="w-4 h-4"
               />
               <label htmlFor="ativo" className="text-sm font-medium">Prémio ativo</label>

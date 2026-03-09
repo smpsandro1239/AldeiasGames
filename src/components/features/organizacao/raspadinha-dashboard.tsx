@@ -67,9 +67,9 @@ function Input({
   onChange: (e: any) => void; 
   placeholder?: string; 
   className?: string;
-  min?: number;
-  max?: number;
-  step?: number;
+  min?: string | number;
+  max?: string | number;
+  step?: string | number;
   id?: string;
   disabled?: boolean;
 }) {

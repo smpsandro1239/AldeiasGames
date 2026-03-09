@@ -22,7 +22,7 @@ export async function DELETE(request: Request) {
     const participacoesPagas = await db.participacao.count({
       where: { 
         userId: user.id,
-        estadoPagamento: 'pago'
+        estado: 'pago'
       }
     });
 
@@ -39,23 +39,11 @@ export async function DELETE(request: Request) {
         where: { userId: user.id }
       });
 
-      // 2. Apagar alterações recebidas (onde é jogador)
-      await tx.alteracaoParticipacao.deleteMany({
-        where: { jogadorId: user.id }
-      });
-
-      // 3. Apagar alterações feitas (onde é admin - apenas se for vendedor)
-      if (user.role === 'vendedor') {
-        await tx.alteracaoParticipacao.deleteMany({
-          where: { adminId: user.id }
-        });
-      }
-
-      // 4. Apagar participações pendentes
+      // 2. Apagar participações pendentes
       await tx.participacao.deleteMany({
         where: { 
           userId: user.id,
-          estadoPagamento: 'pendente'
+          estado: 'pendente'
         }
       });
 

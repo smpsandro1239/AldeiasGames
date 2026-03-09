@@ -64,3 +64,36 @@ export function UIBadge({ children, variant = 'default', className }: any) {
     </span>
   );
 }
+
+export function UIInput({ className, ...props }: any) {
+  return (
+    <input
+      className={cn('w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all', className)}
+      {...props}
+    />
+  );
+}
+
+export function UITextarea({ className, ...props }: any) {
+  return (
+    <textarea
+      className={cn('w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all resize-none', className)}
+      {...props}
+    />
+  );
+}
+
+export function UIDialog({ children, ...props }: any) {
+  return <div {...props}>{children}</div>;
+}
+
+export function UISelect({ className, children, ...props }: any) {
+  return (
+    <select
+      className={cn('w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all bg-white', className)}
+      {...props}
+    >
+      {children}
+    </select>
+  );
+}

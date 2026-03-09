@@ -52,21 +52,27 @@ export async function POST(request: Request) {
       finalImageUrl = await saveBase64Image(validatedData.imagemBase64);
     }
 
-    const generatedSlug = validatedData.slug || validatedData.nome
+    const tituloLower = (validatedData as any).nome || (validatedData as any).titulo || '';
+    const generatedSlug = (validatedData as any).slug || (typeof tituloLower === 'string' ? tituloLower
       .toLowerCase()
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '');
+      .replace(/^-|-$/g, '') : null);
 
     const evento = await db.evento.create({
       data: {
-        ...validatedData,
+        aldeiaId: validatedData.aldeiaId,
+        titulo: (validatedData as any).nome || (validatedData as any).titulo || '',
+        descricao: (validatedData as any).descricao,
         dataInicio: new Date(validatedData.dataInicio),
-        dataFim: validatedData.dataFim ? new Date(validatedData.dataFim) : null,
+        dataFim: validatedData.dataFim ? new Date(validatedData.dataFim) : undefined,
+        estado: (validatedData as any).estado || 'ativo',
+        objectivoAngariacao: (validatedData as any).objectivoAngariacao,
         imagemBase64: null,
         imageUrl: finalImageUrl,
         slug: generatedSlug,
+        ativo: true,
       },
       include: { aldeia: true }
     });
@@ -74,7 +80,7 @@ export async function POST(request: Request) {
     return NextResponse.json(evento, { status: 201 });
   } catch (error) {
     if (error instanceof ZodError) {
-      return NextResponse.json({ error: error.errors[0].message }, { status: 400 });
+      return NextResponse.json({ error: error.issues[0].message }, { status: 400 });
     }
     console.error('Erro ao criar evento:', error);
     return NextResponse.json({ error: 'Erro ao criar evento' }, { status: 500 });

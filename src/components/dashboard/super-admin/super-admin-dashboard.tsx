@@ -159,7 +159,7 @@ function Input({ value, onChange, placeholder, type = 'text', className = '' }: 
   return (
     <input
       type={type}
-      value={value}
+      value={value ?? ''}
       onChange={onChange}
       placeholder={placeholder}
       className={`w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-indigo-500 focus:outline-none transition-colors ${className}`}
@@ -358,19 +358,21 @@ function ModalAldeia({ isOpen, onClose, onSave, aldeiaToEdit }: { isOpen: boolea
     telefone: '',
     localizacao: '',
     morada: '',
-    logo: ''
+    logo: '',
+    estado: 'pendente'
   });
 
   useEffect(() => {
     if (aldeiaToEdit) {
       setForm({
-        nome: aldeiaToEdit.nome,
-        tipoOrganizacao: aldeiaToEdit.tipoOrganizacao,
-        email: aldeiaToEdit.email,
-        telefone: aldeiaToEdit.telefone,
-        localizacao: aldeiaToEdit.localizacao,
+        nome: aldeiaToEdit.nome || '',
+        tipoOrganizacao: aldeiaToEdit.tipoOrganizacao || 'aldeia',
+        email: aldeiaToEdit.email || '',
+        telefone: aldeiaToEdit.telefone || '',
+        localizacao: aldeiaToEdit.localizacao || '',
         morada: (aldeiaToEdit as any).morada || '',
-        logo: (aldeiaToEdit as any).logoBase64 || ''
+        logo: (aldeiaToEdit as any).logoBase64 || '',
+        estado: (aldeiaToEdit as any).estado || 'pendente'
       });
     } else {
       setForm({
@@ -380,7 +382,8 @@ function ModalAldeia({ isOpen, onClose, onSave, aldeiaToEdit }: { isOpen: boolea
         telefone: '',
         localizacao: '',
         morada: '',
-        logo: ''
+        logo: '',
+        estado: 'pendente'
       });
     }
   }, [aldeiaToEdit, isOpen]);
@@ -428,6 +431,18 @@ function ModalAldeia({ isOpen, onClose, onSave, aldeiaToEdit }: { isOpen: boolea
           <Input value={form.localizacao} onChange={(e: any) => setForm({ ...form, localizacao: e.target.value })} placeholder="Ex: Castelo de Paiva, Portugal" />
         </div>
         <div>
+          <label className="block text-sm font-medium mb-1">Estado *</label>
+          <select
+            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl"
+            value={form.estado}
+            onChange={(e: any) => setForm({ ...form, estado: e.target.value })}
+          >
+            <option value="pendente">Pendente</option>
+            <option value="ativa">Ativa</option>
+            <option value="suspensa">Suspensa</option>
+          </select>
+        </div>
+        <div>
           <label className="block text-sm font-medium mb-2">Logo da Aldeia (Opcional)</label>
           <input
             type="file"
@@ -451,7 +466,8 @@ function ModalAldeia({ isOpen, onClose, onSave, aldeiaToEdit }: { isOpen: boolea
           )}
         </div>
         <UIButton onClick={handleSubmit} className="w-full bg-gradient-to-r from-red-500 to-green-500">
-          <Plus className="w-4 h-4 mr-2" /> Criar Aldeia
+          {aldeiaToEdit ? <Edit className="w-4 h-4 mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+          {aldeiaToEdit ? "Guardar Alterações" : "Criar Aldeia"}
         </UIButton>
       </div>
     </Modal>
@@ -875,17 +891,22 @@ export function SuperAdminDashboard() {
       const url = isEdit ? `/api/aldeias/${aldeiaEditing!.id}` : '/api/aldeias';
       const method = isEdit ? 'PATCH' : 'POST';
 
-      const res = await fetch(url, {
+      const res = await fetchWithAuth(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
       });
       if (res.ok) {
         const nova = await res.json();
         if (isEdit) {
-          setAldeias(aldeias.map(a => a.id === nova.id ? { ...a, ...nova } : a));
+          setAldeias(aldeias.map(a => a.id === nova.id ? { ...a, ...nova, estado: nova.estado || a.estado } : a));
         } else {
-          setAldeias([...aldeias, { ...nova, estado: 'ativa', usuariosAtivos: 0, campanhasAtivas: 0, receitaTotal: 0 }]);
+          setAldeias([...aldeias, {
+            ...nova,
+            estado: nova.estado || 'pendente',
+            usuariosAtivos: 0,
+            campanhasAtivas: 0,
+            receitaTotal: 0
+          }]);
         }
         setShowModalAldeia(false);
         confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });

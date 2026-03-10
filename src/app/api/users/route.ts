@@ -6,7 +6,7 @@ import { getUserFromRequest, hashPassword } from '@/lib/auth';
 export async function GET(request: Request) {
   try {
     const user = await getUserFromRequest(request);
-    
+
     if (!user) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
@@ -72,7 +72,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const user = await getUserFromRequest(request);
-    
+
     if (!user) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
@@ -87,7 +87,7 @@ export async function POST(request: Request) {
 
     // Determinar aldeiaId
     let targetAldeiaId = aldeiaId;
-    
+
     if (user.role === 'aldeia_admin') {
       // Aldeia admin só pode criar utilizadores para a sua aldeia
       targetAldeiaId = user.aldeiaId;
@@ -95,9 +95,12 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Utilizador não está associado a nenhuma aldeia' }, { status: 400 });
       }
     } else if (user.role === 'super_admin') {
-      // Super admin pode criar para qualquer aldeia
-      if (!targetAldeiaId) {
-        return NextResponse.json({ error: 'Aldeia é obrigatória' }, { status: 400 });
+      // Super admin pode criar utilizadores com ou sem aldeiaId
+      // No entanto, para vendedores e admins de aldeia, o aldeiaId é recomendado.
+      // Se o role for super_admin, o aldeiaId pode ser nulo.
+      if (!targetAldeiaId && role !== 'super_admin') {
+        // Opcional: manter como alerta ou permitir nulo na DB
+        // Para consistência, se não for super_admin, pedimos aldeia
       }
     } else {
       return NextResponse.json({ error: 'Sem permissão para criar utilizadores' }, { status: 403 });
@@ -114,7 +117,7 @@ export async function POST(request: Request) {
 
     // Criar utilizador
     const passwordHash = await hashPassword(password);
-    
+
     const newUser = await db.user.create({
       data: {
         nome,

@@ -4,7 +4,7 @@ import { hasPermission, Role } from '@/lib/role-permissions';
 
 // Routes accessible by each role
 const ROLE_ROUTES: Record<Role, string[]> = {
-  SUPER_ADMIN: ['/super-admin', '/admin', '/vendedor', '/cliente'],
+  SUPER_ADMIN: ['/superadmin', '/admin', '/vendedor', '/cliente'],
   ADMIN: ['/admin', '/vendedor', '/cliente'],
   VENDEDOR: ['/vendedor', '/cliente'],
   CLIENTE: ['/cliente'],
@@ -54,10 +54,10 @@ export default function proxy(request: NextRequest) {
   if (!hasAccess) {
     // Redirect to default dashboard for role
     const redirectMap: Record<Role, string> = {
-      SUPER_ADMIN: '/super-admin',
-      ADMIN: '/admin',
-      VENDEDOR: '/vendedor',
-      CLIENTE: '/cliente',
+      SUPER_ADMIN: '/superadmin/dashboard',
+      ADMIN: '/admin/dashboard',
+      VENDEDOR: '/vendedor/dashboard',
+      CLIENTE: '/cliente/dashboard',
     };
 
     const redirectUrl = redirectMap[userRole] || '/';

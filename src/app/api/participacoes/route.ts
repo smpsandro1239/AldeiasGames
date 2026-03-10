@@ -75,10 +75,33 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const jogoId = searchParams.get('jogoId');
     const userId = searchParams.get('userId');
+    const aldeiaId = searchParams.get('aldeiaId');
+    
+    // Verificar utilizador
+    const currentUser = await getUserFromRequest(request);
     
     const where: any = {};
     if (jogoId) where.jogoId = jogoId;
     if (userId) where.userId = userId;
+    
+    // Se aldeiaId fornecido ou é aldeia_admin, filtrar por aldeia
+    if (aldeiaId) {
+      where.jogo = {
+        evento: {
+          aldeiaId: aldeiaId
+        }
+      };
+    } else if (currentUser?.role === 'aldeia_admin') {
+      // Filtrar automaticamente por aldeia do admin
+      const user = await db.user.findUnique({ where: { id: currentUser.id } });
+      if (user?.aldeiaId) {
+        where.jogo = {
+          evento: {
+            aldeiaId: user.aldeiaId
+          }
+        };
+      }
+    }
     
     const participacoes = await db.participacao.findMany({
       where,

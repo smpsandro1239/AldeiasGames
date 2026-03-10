@@ -2,49 +2,14 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
 
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params;
-    
-    const plano = await db.plano.findUnique({
-      where: { id }
-    });
-
-    if (!plano) {
-      return NextResponse.json(
-        { error: 'Plano não encontrado' },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json(plano);
-  } catch (error) {
-    console.error('Erro ao buscar plano:', error);
-    return NextResponse.json(
-      { error: 'Erro ao buscar plano' },
-      { status: 500 }
-    );
-  }
-}
-
-export async function PATCH(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   try {
     const user = await getUserFromRequest(request);
-    
     if (!user || user.role !== 'super_admin') {
-      return NextResponse.json(
-        { error: 'Não autorizado' },
-        { status: 403 }
-      );
+      return NextResponse.json({ error: 'Não autorizado' }, { status: 403 });
     }
 
-    const { id } = await params;
+    const { id } = params;
     const body = await request.json();
 
     const plano = await db.plano.update({
@@ -54,40 +19,27 @@ export async function PATCH(
 
     return NextResponse.json(plano);
   } catch (error) {
-    console.error('Erro ao atualizar plano:', error);
-    return NextResponse.json(
-      { error: 'Erro ao atualizar plano' },
-      { status: 500 }
-    );
+    console.error('Erro ao editar plano:', error);
+    return NextResponse.json({ error: 'Erro ao editar plano' }, { status: 500 });
   }
 }
 
-export async function DELETE(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function DELETE(request: Request, { params }: { params: { id: string } }) {
   try {
     const user = await getUserFromRequest(request);
-    
     if (!user || user.role !== 'super_admin') {
-      return NextResponse.json(
-        { error: 'Não autorizado' },
-        { status: 403 }
-      );
+      return NextResponse.json({ error: 'Não autorizado' }, { status: 403 });
     }
 
-    const { id } = await params;
-    
+    const { id } = params;
+
     await db.plano.delete({
       where: { id }
     });
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Erro ao eliminar plano:', error);
-    return NextResponse.json(
-      { error: 'Erro ao eliminar plano' },
-      { status: 500 }
-    );
+    console.error('Erro ao apagar plano:', error);
+    return NextResponse.json({ error: 'Erro ao apagar plano' }, { status: 500 });
   }
 }

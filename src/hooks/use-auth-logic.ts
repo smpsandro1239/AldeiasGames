@@ -38,6 +38,8 @@ export function useAuthLogic() {
   const logout = () => {
     console.log('useAuthLogic logout called');
     localStorage.removeItem('token');
+    // Clear role cookie
+    document.cookie = "user-role=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
     setUser(null);
     router.push('/');
   };

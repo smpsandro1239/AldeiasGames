@@ -11,7 +11,17 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const aldeiaId = searchParams.get('aldeiaId');
     
-    const where = aldeiaId ? { aldeiaId } : {};
+    // Verificar utilizador para filtrar por aldeia
+    const currentUser = await getUserFromRequest(request);
+    let userAldeiaId = aldeiaId;
+    
+    // Se é aldeia_admin e não forneceu aldeiaId, usar a sua aldeia
+    if (!aldeiaId && currentUser?.role === 'aldeia_admin') {
+      const user = await db.user.findUnique({ where: { id: currentUser.id } });
+      userAldeiaId = user?.aldeiaId || null;
+    }
+    
+    const where = userAldeiaId ? { aldeiaId: userAldeiaId } : {};
     
     const eventos = await db.evento.findMany({
       where,

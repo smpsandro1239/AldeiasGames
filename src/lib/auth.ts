@@ -48,19 +48,37 @@ export async function verifyToken(token: string): Promise<UserPayload | null> {
  * Obtém o utilizador autenticado a partir do request
  */
 export async function getUserFromRequest(request: Request): Promise<UserPayload | null> {
+  let token = null;
+
+  // 1. Tentar Header Authorization
   const authHeader = request.headers.get('authorization');
-  if (!authHeader?.startsWith('Bearer ')) {
-    // Tentar obter de cookies se necessário (para futuro)
-    return null;
+  if (authHeader?.startsWith('Bearer ')) {
+    token = authHeader.slice(7);
   }
-  
-  const token = authHeader.slice(7);
-  return verifyToken(token);
+
+  // 2. Tentar Cookies se não houver Header
+  if (!token) {
+    const cookieHeader = request.headers.get('cookie');
+    const cookies = Object.fromEntries(cookieHeader?.split('; ').map(c => c.split('=')) || []);
+    token = cookies['auth-token'];
+  }
+
+  if (!token) return null;
+
+  const payload = await verifyToken(token);
+  if (payload) {
+    // Normalizar role para lowercase para consistência nas verificações de API
+    return {
+      ...payload,
+      role: payload.role.toLowerCase()
+    };
+  }
+  return null;
 }
 
 export async function registerUser(nome: string, email: string, password: string, role: string = 'user', aldeiaId?: string) {
   const passwordHash = await hashPassword(password);
-  
+
   const user = await db.user.create({
     data: {
       nome,
@@ -70,7 +88,7 @@ export async function registerUser(nome: string, email: string, password: string
       aldeiaId,
     },
   });
-  
+
   return user;
 }
 
@@ -79,11 +97,11 @@ export async function loginUser(email: string, password: string) {
     where: { email },
     include: { aldeia: true },
   });
-  
+
   if (!user) return null;
-  
+
   const valid = await verifyPassword(password, user.passwordHash);
   if (!valid) return null;
-  
+
   return user;
 }

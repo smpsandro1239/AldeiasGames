@@ -12,7 +12,7 @@ export async function GET(request: Request) {
     const where = eventoId ? { eventoId } : {};
     const paginacao = getPaginacaoParams(searchParams);
     const total = await db.jogo.count({ where });
-    
+
     const jogos = await db.jogo.findMany({
       where,
       include: {
@@ -43,5 +43,40 @@ export async function GET(request: Request) {
   } catch (error) {
     console.error("Erro ao buscar jogos:", error);
     return NextResponse.json({ error: "Erro ao buscar jogos" }, { status: 500 });
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const user = await getUserFromRequest(request);
+    if (!user || !['super_admin', 'aldeia_admin'].includes(user.role)) {
+      return NextResponse.json({ error: 'Não autorizado' }, { status: 403 });
+    }
+
+    const body = await request.json();
+    const validatedData = jogoSchema.parse(body);
+
+    const jogo = await db.jogo.create({
+      data: {
+        titulo: (body as any).titulo || 'Novo Jogo',
+        tipo: validatedData.tipo,
+        estado: (body as any).estado || 'aberto',
+        eventoId: validatedData.eventoId,
+        precoParticipacao: validatedData.precoParticipacao,
+        config: typeof validatedData.config === 'string' ? validatedData.config : JSON.stringify(validatedData.config),
+        premioId: validatedData.premioId,
+        stockInicial: validatedData.stockInicial,
+        premiosRaspadinha: validatedData.premiosRaspadinha ? JSON.stringify(validatedData.premiosRaspadinha) : null,
+        limitePorUsuario: validatedData.limitePorUsuario,
+      }
+    });
+
+    return NextResponse.json(jogo, { status: 201 });
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return NextResponse.json({ error: error.issues[0].message }, { status: 400 });
+    }
+    console.error('Erro ao criar jogo:', error);
+    return NextResponse.json({ error: 'Erro ao criar jogo' }, { status: 500 });
   }
 }

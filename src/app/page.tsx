@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  Trophy, 
+import {
+  Trophy,
   Menu,
   X,
   LayoutDashboard,
@@ -36,7 +36,8 @@ import { CookieBanner } from '@/components/CookieBanner';
 import { LoadingScreen } from '@/components/LoadingScreen';
 
 // Dashboard Views
-import { AdminDashboardView } from '@/features/AdminDashboardView';
+import { SuperAdminDashboard } from '@/components/dashboard/super-admin/super-admin-dashboard';
+import { AldeiaAdminDashboard } from '@/features/AldeiaAdminDashboard';
 import { VendedorDashboardView } from '@/features/VendedorDashboardView';
 import { NotificacoesModal } from '@/components/notificacoes-modal';
 import { ClienteDashboardView } from '@/features/ClienteDashboardView';
@@ -93,19 +94,42 @@ export default function AldeiasGames() {
       const data = await res.json();
       if (data.token) {
         localStorage.setItem('token', data.token);
+        // Set cookies for middleware and backend
+        document.cookie = `user-role=${role.toUpperCase()}; path=/; max-age=86400`;
+        document.cookie = `auth-token=${data.token}; path=/; max-age=86400`;
         setUser(data.user);
+
+        // Redirect immediately
+        const redirectMap: Record<string, string> = {
+          'SUPER_ADMIN': '/superadmin/dashboard',
+          'ALDEIA_ADMIN': '/admin/dashboard',
+          'VENDEDOR': '/vendedor/dashboard',
+          'CLIENTE': '/cliente/dashboard',
+          'USER': '/cliente/dashboard'
+        };
+        window.location.href = redirectMap[role.toUpperCase()] || '/';
       } else {
         // Fallback: criar utilizador mock para desenvolvimento
         const mockUser = {
           id: `dev-${role}`,
           nome: `Dev ${role.replace('_', ' ')}`,
           email: email,
-          role: role,
+          role: role.toUpperCase(),
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
         localStorage.setItem('token', 'dev-token');
+        document.cookie = `user-role=${role.toUpperCase()}; path=/; max-age=86400`;
         setUser(mockUser as any);
+
+        const redirectMap: Record<string, string> = {
+          'SUPER_ADMIN': '/superadmin/dashboard',
+          'ALDEIA_ADMIN': '/admin/dashboard',
+          'VENDEDOR': '/vendedor/dashboard',
+          'CLIENTE': '/cliente/dashboard',
+          'USER': '/cliente/dashboard'
+        };
+        window.location.href = redirectMap[role.toUpperCase()] || '/';
       }
     } catch (err) {
       console.error('Login error:', err);
@@ -113,6 +137,22 @@ export default function AldeiasGames() {
       setLoginAsLoading(null);
     }
   };
+
+  useEffect(() => {
+    if (user && !authLoading) {
+      const role = user.role.toUpperCase();
+      const redirectMap: Record<string, string> = {
+        'SUPER_ADMIN': '/superadmin/dashboard',
+        'ALDEIA_ADMIN': '/admin/dashboard',
+        'VENDEDOR': '/vendedor/dashboard',
+        'CLIENTE': '/cliente/dashboard',
+        'USER': '/cliente/dashboard'
+      };
+      if (redirectMap[role]) {
+        window.location.href = redirectMap[role];
+      }
+    }
+  }, [user, authLoading]);
 
   const [modals, setModals] = useState({
     auth: false,
@@ -155,54 +195,54 @@ export default function AldeiasGames() {
           <Trophy className="w-20 h-20 text-indigo-600 mb-6 animate-bounce" />
           <h1 className="text-4xl font-extrabold text-gray-900 mb-4 tracking-tight">Bem-vindo ao Aldeias Games</h1>
           <p className="text-xl text-gray-600 mb-8 max-w-2xl">A plataforma definitiva para dinamização de eventos e raspadinhas digitais.</p>
-          
+
           {/* Botões de Login Direto por Role */}
           <div className="flex flex-wrap justify-center gap-4 mb-8">
             <button
-              onClick={() => loginAs('admin@aldeias.pt', 'super_admin')}
-              disabled={loginAsLoading === 'super_admin'}
+              onClick={() => loginAs('admin@aldeias.pt', 'SUPER_ADMIN')}
+              disabled={loginAsLoading === 'SUPER_ADMIN'}
               className="flex items-center gap-2 px-6 py-4 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white rounded-xl font-semibold shadow-lg transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loginAsLoading === 'super_admin' ? (
+              {loginAsLoading === 'SUPER_ADMIN' ? (
                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : (
                 <Crown className="w-5 h-5" />
               )}
               Super Admin
             </button>
-            
+
             <button
-              onClick={() => loginAs('aldeia@gmail.com', 'aldeia_admin')}
-              disabled={loginAsLoading === 'aldeia_admin'}
+              onClick={() => loginAs('aldeia@gmail.com', 'ALDEIA_ADMIN')}
+              disabled={loginAsLoading === 'ALDEIA_ADMIN'}
               className="flex items-center gap-2 px-6 py-4 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white rounded-xl font-semibold shadow-lg transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loginAsLoading === 'aldeia_admin' ? (
+              {loginAsLoading === 'ALDEIA_ADMIN' ? (
                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : (
                 <Building2 className="w-5 h-5" />
               )}
               Admin Aldeia
             </button>
-            
+
             <button
-              onClick={() => loginAs('vendedor@gmail.com', 'vendedor')}
-              disabled={loginAsLoading === 'vendedor'}
+              onClick={() => loginAs('vendedor@gmail.com', 'VENDEDOR')}
+              disabled={loginAsLoading === 'VENDEDOR'}
               className="flex items-center gap-2 px-6 py-4 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-xl font-semibold shadow-lg transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loginAsLoading === 'vendedor' ? (
+              {loginAsLoading === 'VENDEDOR' ? (
                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : (
                 <Users className="w-5 h-5" />
               )}
               Vendedor
             </button>
-            
+
             <button
-              onClick={() => loginAs('smpsandro1239@gmail.com', 'user')}
-              disabled={loginAsLoading === 'user'}
+              onClick={() => loginAs('smpsandro1239@gmail.com', 'CLIENTE')}
+              disabled={loginAsLoading === 'CLIENTE'}
               className="flex items-center gap-2 px-6 py-4 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-xl font-semibold shadow-lg transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loginAsLoading === 'user' ? (
+              {loginAsLoading === 'CLIENTE' ? (
                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : (
                 <UserIcon className="w-5 h-5" />
@@ -210,32 +250,33 @@ export default function AldeiasGames() {
               Jogador
             </button>
           </div>
-          
+
           <p className="text-sm text-gray-500 mb-4">Ou autentique-se normalmente:</p>
           <UIButton onClick={() => toggleModal('auth', true)} size="lg" variant="outline" className="px-8 py-6 text-lg">Entrar / Registar</UIButton>
         </div>
       );
     }
-    if (activeTab === 'crm' && user.role === 'super_admin') return <CRMAdminView stats={stats as any} />;
+    if (activeTab === 'crm' && user.role.toUpperCase() === 'SUPER_ADMIN') return <CRMAdminView stats={stats as any} />;
 
-    switch (user.role) {
-      case 'super_admin':
-      case 'aldeia_admin':
+    const roleNormalized = user.role.toUpperCase();
+
+    switch (roleNormalized) {
+      case 'SUPER_ADMIN':
         return (
-          <AdminDashboardView
-            stats={stats as any}
-            organizacoes={organizacoes}
-            eventos={eventos}
-            activeTab={activeTab}
-            onCreateClick={(type) => toggleModal('create', type)}
-            onOrgClick={(org) => toggleModal('orgDetail', org)}
-            onEventClick={(ev) => toggleModal('eventDetail', ev)}
-            onExport={exportToExcel}
+          <SuperAdminDashboard />
+        );
+      case 'ALDEIA_ADMIN':
+        // Admin Aldeia vê dashboard específico da sua aldeia
+        return (
+          <AldeiaAdminDashboard
+            aldeiaId={user.aldeiaId || ''}
+            aldeiaNome={user.aldeia?.nome || 'Minha Aldeia'}
           />
         );
-      case 'vendedor':
+      case 'VENDEDOR':
         return <VendedorDashboardView user={user} stats={stats as any} eventos={eventos} onParticipar={(jogo) => toggleModal('participar', jogo)} />;
-      case 'user':
+      case 'CLIENTE':
+      case 'USER':
       default:
         return <ClienteDashboardView user={user} eventos={filteredEventos} participacoes={minhasParticipacoes} onParticipar={(jogo: Jogo) => toggleModal('participar', jogo)} onRevelar={async (id) => {
           const res = await handleRevelarRaspadinha(id);
@@ -334,7 +375,7 @@ export default function AldeiasGames() {
           <EventDetailModal evento={modals.eventDetail} onClose={() => toggleModal('eventDetail', null)} onUpdate={refreshOrgData} />
           <PricingModal isOpen={modals.pricing} onClose={() => toggleModal('pricing', false)} currentPlan="Aldeia Grátis" />
           <RaspadinhaModal isOpen={!!modals.raspadinha} onClose={() => toggleModal('raspadinha', null)} participacao={modals.raspadinha} onRevelar={handleRevelarRaspadinha} />
-          <GerirParticipacaoModal isOpen={!!modals.gerirParticipacao} onClose={() => toggleModal('gerirParticipacao', null)} participacao={modals.gerirParticipacao} onAnular={() => {}} onTrocar={() => {}} />
+          <GerirParticipacaoModal isOpen={!!modals.gerirParticipacao} onClose={() => toggleModal('gerirParticipacao', null)} participacao={modals.gerirParticipacao} onAnular={() => { }} onTrocar={() => { }} />
         </>
       )}
       {!user && (

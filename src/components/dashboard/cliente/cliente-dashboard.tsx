@@ -8,7 +8,7 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
+import {
   Gamepad2,
   Ticket,
   Gift,
@@ -41,20 +41,7 @@ import {
 import confetti from 'canvas-confetti';
 import { UIButton, UICard, UIBadge } from '@/components/ui-components';
 
-// ============================================
-// LOGOUT HANDLER
-// ============================================
-
-function handleLogout() {
-  console.log('Logout clicked');
-  alert('Logout clicked!');
-  document.cookie.split(";").forEach((c) => { 
-    document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
-  });
-  localStorage.clear();
-  console.log('Redirecting to /');
-  window.location.href = '/';
-}
+import { useRouter } from 'next/navigation';
 
 // ============================================
 // TIPOS
@@ -170,12 +157,12 @@ function CampanhaCard({ campanha, onJogar }: { campanha: Campanha; onJogar: (c: 
           <Badge variant="success">Ativa</Badge>
         </div>
       </div>
-      
+
       {/* Content */}
       <div className="p-4">
         <h3 className="font-bold text-lg mb-1">{campanha.titulo}</h3>
         <p className="text-sm text-gray-500 mb-3">🎁 {campanha.premioPrincipal}</p>
-        
+
         <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
           <span className="flex items-center gap-1"><Users className="w-4 h-4" /> {campanha.participantes} jogadores</span>
           <span className="font-bold text-green-600">€{campanha.preco.toFixed(2)}</span>
@@ -196,23 +183,23 @@ function CampanhaCard({ campanha, onJogar }: { campanha: Campanha; onJogar: (c: 
 function RaspadinhaMinigame({ campanha, onClose }: { campanha: Campanha; onClose: () => void }) {
   const [areas, setAreas] = useState<boolean[]>(Array(9).fill(false));
   const [resultado, setResultado] = useState<'pendente' | 'ganhou' | 'perdeu'>('pendente');
-  
+
   const symbols = ['⭐', '💰', '🎁', '🍀', '🔥', '💎', '🎀', '⭐', '💰'];
-  
+
   const revelarArea = (index: number) => {
     if (areas[index] || resultado !== 'pendente') return;
-    
+
     const novasAreas = [...areas];
     novasAreas[index] = true;
     setAreas(novasAreas);
-    
+
     // Simular resultado (em produção viria da API)
     const areasReveladas = novasAreas.filter(a => a).length;
     if (areasReveladas >= 3) {
       // Verificar se ganhou (simulação)
       const ganhou = Math.random() > 0.7;
       setResultado(ganhou ? 'ganhou' : 'perdeu');
-      
+
       if (ganhou) {
         confetti({
           particleCount: 100,
@@ -242,11 +229,10 @@ function RaspadinhaMinigame({ campanha, onClose }: { campanha: Campanha; onClose
             whileTap={{ scale: 0.95 }}
             onClick={() => revelarArea(i)}
             disabled={areas[i]}
-            className={`aspect-square rounded-xl flex items-center justify-center text-4xl transition-all ${
-              areas[i]
+            className={`aspect-square rounded-xl flex items-center justify-center text-4xl transition-all ${areas[i]
                 ? resultado === 'ganhou' ? 'bg-green-100' : 'bg-gray-100'
                 : 'bg-gradient-to-br from-gray-300 to-gray-400 hover:from-gray-200 hover:to-gray-300'
-            }`}
+              }`}
           >
             {areas[i] ? symbol : '❓'}
           </motion.button>
@@ -315,6 +301,18 @@ function PremiosGallery({ premios }: { premios: Premio[] }) {
 // ============================================
 
 export function ClienteDashboard() {
+  const router = useRouter();
+
+  const handleLogout = () => {
+    console.log('Logout clicked');
+    document.cookie.split(";").forEach((c) => {
+      document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+    });
+    localStorage.clear();
+    console.log('Redirecting to /');
+    router.push('/');
+  };
+
   const [activeTab, setActiveTab] = useState('explorar');
   const [showJogar, setShowJogar] = useState<Campanha | null>(null);
   const [showPerfil, setShowPerfil] = useState(false);
@@ -366,9 +364,9 @@ export function ClienteDashboard() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <button 
+              <button
                 onClick={handleLogout}
-                className="p-2 hover:bg-red-50 rounded-xl text-red-600" 
+                className="p-2 hover:bg-red-50 rounded-xl text-red-600"
                 title="Logout"
               >
                 <LogOut className="w-5 h-5" />
@@ -408,11 +406,10 @@ export function ClienteDashboard() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-medium transition-all ${
-                activeTab === tab.id
+              className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-medium transition-all ${activeTab === tab.id
                   ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white'
                   : 'text-gray-600 hover:bg-gray-50'
-              }`}
+                }`}
             >
               <tab.icon className="w-4 h-4" />
               <span className="hidden sm:inline text-sm">{tab.label}</span>
@@ -467,7 +464,7 @@ export function ClienteDashboard() {
                   <h2 className="text-xl font-black">Utilizador</h2>
                   <p className="text-gray-500">utilizador@email.pt</p>
                 </div>
-                
+
                 <div className="space-y-3">
                   <div className="flex justify-between p-3 bg-gray-50 rounded-xl">
                     <span className="text-gray-600">Total Gasto</span>

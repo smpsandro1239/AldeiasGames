@@ -8,7 +8,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
+import {
   Building2,
   Users,
   Gamepad2,
@@ -52,19 +52,7 @@ import {
 import confetti from 'canvas-confetti';
 import { UIButton, UICard, UIBadge } from '@/components/ui-components';
 
-// ============================================
-// LOGOUT HANDLER
-// ============================================
-
-function handleLogout() {
-  console.log('Admin logout clicked');
-  alert('Admin logout clicked!');
-  document.cookie.split(";").forEach((c) => { 
-    document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
-  });
-  localStorage.clear();
-  window.location.href = '/';
-}
+import { useRouter } from 'next/navigation';
 
 // ============================================
 // TIPOS
@@ -339,6 +327,17 @@ function ModalCriarVendedor({ isOpen, onClose, onSave }: { isOpen: boolean; onCl
 // ============================================
 
 export function AdminDashboard() {
+  const router = useRouter();
+
+  const handleLogout = () => {
+    console.log('Admin logout clicked');
+    document.cookie.split(";").forEach((c) => {
+      document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+    });
+    localStorage.clear();
+    router.push('/');
+  };
+
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showCriarCampanha, setShowCriarCampanha] = useState(false);
   const [showCriarVendedor, setShowCriarVendedor] = useState(false);
@@ -424,9 +423,9 @@ export function AdminDashboard() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <button 
+              <button
                 onClick={handleLogout}
-                className="p-3 hover:bg-red-50 rounded-xl text-red-600" 
+                className="p-3 hover:bg-red-50 rounded-xl text-red-600"
                 title="Logout"
               >
                 <LogOut className="w-5 h-5" />
@@ -453,9 +452,8 @@ export function AdminDashboard() {
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
-                      activeTab === tab.id ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white' : 'text-gray-600 hover:bg-gray-100'
-                    }`}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === tab.id ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white' : 'text-gray-600 hover:bg-gray-100'
+                      }`}
                   >
                     <tab.icon className="w-5 h-5" />
                     <span className="font-medium">{tab.label}</span>
@@ -530,7 +528,7 @@ export function AdminDashboard() {
                     </div>
                     <div className="grid md:grid-cols-2 gap-4">
                       {campanhas.filter(c => c.estado === 'ativa').map((c) => (
-                        <CampanhaCard key={c.id} campanha={c} onEdit={() => {}} onPausar={() => {}} onVer={() => {}} />
+                        <CampanhaCard key={c.id} campanha={c} onEdit={() => { }} onPausar={() => { }} onVer={() => { }} />
                       ))}
                     </div>
                   </UICard>
@@ -548,7 +546,7 @@ export function AdminDashboard() {
                   </div>
                   <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {campanhas.map((c) => (
-                      <CampanhaCard key={c.id} campanha={c} onEdit={() => {}} onPausar={() => {}} onVer={() => {}} />
+                      <CampanhaCard key={c.id} campanha={c} onEdit={() => { }} onPausar={() => { }} onVer={() => { }} />
                     ))}
                   </div>
                 </motion.div>
@@ -565,7 +563,7 @@ export function AdminDashboard() {
                   </div>
                   <div className="space-y-3">
                     {vendedores.map((v) => (
-                      <VendedorRow key={v.id} vendedor={v} onEdit={() => {}} />
+                      <VendedorRow key={v.id} vendedor={v} onEdit={() => { }} />
                     ))}
                   </div>
                 </motion.div>

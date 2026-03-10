@@ -34,6 +34,9 @@ export const aldeiaSchema = z.object({
   localizacao: z.string().optional(),
   logoBase64: z.string().optional(),
   tipoOrganizacao: z.enum(['aldeia', 'escola', 'associacao_pais', 'clube', 'comite', 'outro']).default('aldeia'),
+  email: z.string().email('Email inválido').optional().nullable(),
+  telefone: z.string().optional().nullable(),
+  estado: z.enum(['pendente', 'ativa', 'suspensa']).default('pendente'),
   slug: z.string().optional(),
 });
 

@@ -9,7 +9,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    
+
     const aldeia = await db.aldeia.findUnique({
       where: { id },
       include: {
@@ -50,7 +50,7 @@ export async function PATCH(
 ) {
   try {
     const user = await getUserFromRequest(request);
-    
+
     if (!user) {
       return NextResponse.json(
         { error: 'Não autorizado' },
@@ -59,7 +59,7 @@ export async function PATCH(
     }
 
     const { id } = await params;
-    
+
     // Verificar permissões: super_admin pode editar qualquer uma, aldeia_admin só a sua
     if (user.role !== 'super_admin' && user.aldeiaId !== id) {
       return NextResponse.json(
@@ -69,11 +69,11 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const { 
-      nome, 
-      descricao, 
-      localizacao, 
-      logoUrl, 
+    const {
+      nome,
+      descricao,
+      localizacao,
+      logoUrl,
       logoBase64,
       // Novos campos v3.0
       morada,
@@ -86,6 +86,9 @@ export async function PATCH(
       nivelEnsino,
       autorizacaoCM,
       numeroAlvara,
+      email,
+      telefone,
+      estado,
     } = body;
 
     const aldeia = await db.aldeia.update({
@@ -107,6 +110,9 @@ export async function PATCH(
         nivelEnsino,
         autorizacaoCM,
         numeroAlvara,
+        email,
+        telefone,
+        estado,
       }
     });
 
@@ -126,7 +132,7 @@ export async function DELETE(
 ) {
   try {
     const user = await getUserFromRequest(request);
-    
+
     if (!user || user.role !== 'super_admin') {
       return NextResponse.json(
         { error: 'Não autorizado' },
@@ -135,7 +141,7 @@ export async function DELETE(
     }
 
     const { id } = await params;
-    
+
     await db.aldeia.delete({
       where: { id }
     });

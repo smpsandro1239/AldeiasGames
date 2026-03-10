@@ -8,7 +8,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
+import {
   Building2,
   Users,
   Gamepad2,
@@ -44,19 +44,7 @@ import {
 import confetti from 'canvas-confetti';
 import { UIButton, UICard, UIBadge } from '@/components/ui-components';
 
-// ============================================
-// LOGOUT HANDLER
-// ============================================
-
-function handleLogout() {
-  // Clear cookies/localStorage
-  document.cookie.split(";").forEach((c) => { 
-    document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
-  });
-  localStorage.clear();
-  // Redirect to home
-  window.location.href = '/';
-}
+import { useRouter } from 'next/navigation';
 
 // ============================================
 // TIPOS
@@ -185,7 +173,7 @@ function AldeiasTable({ aldeias, onEdit, onVer, onDelete }: { aldeias: Aldeia[];
         </thead>
         <tbody>
           {aldeias.map((aldeia, i) => (
-            <motion.tr 
+            <motion.tr
               key={aldeia.id}
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -342,6 +330,18 @@ function ModalCriarAldeia({ isOpen, onClose, onSave }: { isOpen: boolean; onClos
 // ============================================
 
 export function SuperAdminDashboard() {
+  const router = useRouter();
+
+  const handleLogout = () => {
+    // Clear cookies/localStorage
+    document.cookie.split(";").forEach((c) => {
+      document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+    });
+    localStorage.clear();
+    // Redirect to home
+    router.push('/');
+  };
+
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showCriarAldeia, setShowCriarAldeia] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -378,7 +378,7 @@ export function SuperAdminDashboard() {
     setLoading(false);
   }, []);
 
-  const aldeiasFiltradas = aldeias.filter(a => 
+  const aldeiasFiltradas = aldeias.filter(a =>
     a.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
     a.localizacao.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -412,9 +412,9 @@ export function SuperAdminDashboard() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <button 
+              <button
                 onClick={handleLogout}
-                className="p-3 hover:bg-red-50 rounded-xl text-red-600" 
+                className="p-3 hover:bg-red-50 rounded-xl text-red-600"
                 title="Logout"
               >
                 <LogOut className="w-5 h-5" />
@@ -441,11 +441,10 @@ export function SuperAdminDashboard() {
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
-                      activeTab === tab.id
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === tab.id
                         ? 'bg-gradient-to-r from-red-500 to-green-500 text-white'
                         : 'text-gray-600 hover:bg-gray-100'
-                    }`}
+                      }`}
                   >
                     <tab.icon className="w-5 h-5" />
                     <span className="font-medium">{tab.label}</span>
@@ -501,9 +500,9 @@ export function SuperAdminDashboard() {
                         <div className="relative w-32 h-32">
                           <svg className="w-full h-full transform -rotate-90">
                             <circle cx="64" cy="64" r="50" stroke="#E5E7EB" strokeWidth="20" fill="none" />
-                            <circle cx="64" cy="64" r="50" stroke="#16A34A" strokeWidth="20" fill="none" strokeDasharray={`${(38/47)*314} 314`} />
-                            <circle cx="64" cy="64" r="50" stroke="#F59E0B" strokeWidth="20" fill="none" strokeDasharray={`${(6/47)*314} 314`} strokeDashoffset={`-${(38/47)*314}`} />
-                            <circle cx="64" cy="64" r="50" stroke="#DC2626" strokeWidth="20" fill="none" strokeDasharray={`${(3/47)*314} 314`} strokeDashoffset={`-${((38+6)/47)*314}`} />
+                            <circle cx="64" cy="64" r="50" stroke="#16A34A" strokeWidth="20" fill="none" strokeDasharray={`${(38 / 47) * 314} 314`} />
+                            <circle cx="64" cy="64" r="50" stroke="#F59E0B" strokeWidth="20" fill="none" strokeDasharray={`${(6 / 47) * 314} 314`} strokeDashoffset={`-${(38 / 47) * 314}`} />
+                            <circle cx="64" cy="64" r="50" stroke="#DC2626" strokeWidth="20" fill="none" strokeDasharray={`${(3 / 47) * 314} 314`} strokeDashoffset={`-${((38 + 6) / 47) * 314}`} />
                           </svg>
                         </div>
                         <div className="space-y-2">

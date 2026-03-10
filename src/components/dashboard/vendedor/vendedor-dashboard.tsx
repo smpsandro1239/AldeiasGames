@@ -8,7 +8,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
+import {
   DollarSign,
   TrendingUp,
   QrCode,
@@ -40,19 +40,7 @@ import {
 import confetti from 'canvas-confetti';
 import { UIButton, UICard, UIBadge } from '@/components/ui-components';
 
-// ============================================
-// LOGOUT HANDLER
-// ============================================
-
-function handleLogout() {
-  console.log('Vendedor logout clicked');
-  alert('Vendedor logout clicked!');
-  document.cookie.split(";").forEach((c) => { 
-    document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
-  });
-  localStorage.clear();
-  window.location.href = '/';
-}
+import { useRouter } from 'next/navigation';
 
 // ============================================
 // TIPOS
@@ -63,7 +51,7 @@ interface Campanha {
   titulo: string;
   tipo: string;
   preco: number;
- stock: number;
+  stock: number;
   Vendidas: number;
 }
 
@@ -180,7 +168,7 @@ function TerminalVenda({ campanhas, onVender }: { campanhas: Campanha[]; onVende
   return (
     <div className="space-y-4">
       <h3 className="font-bold text-lg mb-4">Selecionar Campanha</h3>
-      
+
       {!campanhaSelecionada ? (
         <div className="grid gap-3">
           {campanhas.map((c) => (
@@ -220,8 +208,8 @@ function TerminalVenda({ campanhas, onVender }: { campanhas: Campanha[]; onVende
             <label className="block text-sm font-medium mb-2">Quantidade</label>
             <div className="flex items-center gap-4">
               <button onClick={() => setQuantidade(Math.max(1, quantidade - 1))} className="w-12 h-12 bg-gray-100 rounded-xl font-bold text-xl">-</button>
-              <input 
-                type="number" 
+              <input
+                type="number"
                 value={quantidade}
                 onChange={(e) => setQuantidade(Math.max(1, parseInt(e.target.value) || 1))}
                 className="flex-1 text-center text-2xl font-bold py-2 border-2 border-gray-200 rounded-xl"
@@ -251,6 +239,17 @@ function TerminalVenda({ campanhas, onVender }: { campanhas: Campanha[]; onVende
 // ============================================
 
 export function VendedorDashboard() {
+  const router = useRouter();
+
+  const handleLogout = () => {
+    console.log('Vendedor logout clicked');
+    document.cookie.split(";").forEach((c) => {
+      document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+    });
+    localStorage.clear();
+    router.push('/');
+  };
+
   const [activeTab, setActiveTab] = useState('venda');
   const [showScanner, setShowScanner] = useState(false);
 
@@ -280,7 +279,7 @@ export function VendedorDashboard() {
   const handleVender = (campanha: Campanha, quantidade: number) => {
     const valor = campanha.preco * quantidade;
     const comissao = valor * 0.10;
-    
+
     const novaVenda: Venda = {
       id: Date.now().toString(),
       campanha: campanha.titulo,
@@ -289,9 +288,9 @@ export function VendedorDashboard() {
       comissao,
       timestamp: new Date().toISOString()
     };
-    
+
     setVendas([novaVenda, ...vendas]);
-    
+
     confetti({
       particleCount: 60,
       spread: 70,
@@ -326,9 +325,9 @@ export function VendedorDashboard() {
                 <p className="text-xs text-gray-500">Comissão Hoje</p>
                 <p className="font-bold text-green-600">€{stats.comissaoHoje.toFixed(2)}</p>
               </div>
-              <button 
+              <button
                 onClick={handleLogout}
-                className="p-2 hover:bg-red-50 rounded-xl text-red-600" 
+                className="p-2 hover:bg-red-50 rounded-xl text-red-600"
                 title="Logout"
               >
                 <LogOut className="w-4 h-4" />
@@ -360,11 +359,10 @@ export function VendedorDashboard() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-medium transition-all ${
-                activeTab === tab.id
+              className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-medium transition-all ${activeTab === tab.id
                   ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white'
                   : 'text-gray-600 hover:bg-gray-50'
-              }`}
+                }`}
             >
               <tab.icon className="w-4 h-4" />
               <span className="hidden sm:inline">{tab.label}</span>
@@ -379,22 +377,22 @@ export function VendedorDashboard() {
             <motion.div key="venda" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
               <UICard className="p-4">
                 <div className="flex gap-2 mb-4">
-                  <UIButton 
-                    variant={!showScanner ? 'primary' : 'outline'} 
+                  <UIButton
+                    variant={!showScanner ? 'primary' : 'outline'}
                     onClick={() => setShowScanner(false)}
                     className="flex-1"
                   >
                     <Ticket className="w-4 h-4 mr-2" /> Manual
                   </UIButton>
-                  <UIButton 
-                    variant={showScanner ? 'primary' : 'outline'} 
+                  <UIButton
+                    variant={showScanner ? 'primary' : 'outline'}
                     onClick={() => setShowScanner(true)}
                     className="flex-1"
                   >
                     <Camera className="w-4 h-4 mr-2" /> QR Code
                   </UIButton>
                 </div>
-                
+
                 {showScanner ? (
                   <div className="text-center py-8">
                     <Camera className="w-16 h-16 text-gray-300 mx-auto mb-4" />

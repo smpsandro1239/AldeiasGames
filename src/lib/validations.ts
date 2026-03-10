@@ -30,14 +30,20 @@ export const raspadinhaBatchSchema = z.object({
 
 export const aldeiaSchema = z.object({
   nome: z.string().min(2),
-  descricao: z.string().optional(),
-  localizacao: z.string().optional(),
-  logoBase64: z.string().optional(),
+  descricao: z.string().optional().nullable(),
+  localizacao: z.string().optional().nullable(),
+  logoBase64: z.string().optional().nullable(),
+  logoUrl: z.string().optional().nullable(),
   tipoOrganizacao: z.enum(['aldeia', 'escola', 'associacao_pais', 'clube', 'comite', 'outro']).default('aldeia'),
-  email: z.string().email('Email inválido').optional().nullable(),
+  email: z.string().email('Email inválido').optional().nullable().or(z.literal('')),
   telefone: z.string().optional().nullable(),
   estado: z.enum(['pendente', 'ativa', 'suspensa']).default('pendente'),
   slug: z.string().optional(),
+  morada: z.string().optional().nullable(),
+  codigoPostal: z.string().optional().nullable(),
+  localidade: z.string().optional().nullable(),
+  autorizacaoCM: z.boolean().optional().default(false),
+  numeroAlvara: z.string().optional().nullable(),
 });
 
 export const eventoSchema = z.object({
@@ -47,6 +53,8 @@ export const eventoSchema = z.object({
   dataInicio: z.string().or(z.date()),
   dataFim: z.string().or(z.date()).optional().nullable(),
   estado: z.string().default('agendado'),
+  imageUrl: z.string().optional().nullable(),
+  imagemBase64: z.string().optional().nullable(),
   objectivoAngariacao: z.number().optional().nullable(),
 });
 

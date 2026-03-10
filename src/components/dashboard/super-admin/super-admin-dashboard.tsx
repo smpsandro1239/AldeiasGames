@@ -64,10 +64,17 @@ async function fetchWithAuth(url: string, options: any = {}) {
 interface Aldeia {
   id: string;
   nome: string;
+  slug?: string;
   tipoOrganizacao: string;
+  descricao?: string;
   localizacao: string;
+  morada?: string;
+  codigoPostal?: string;
+  localidade?: string;
   email: string;
   telefone: string;
+  logoUrl?: string;
+  logoBase64?: string;
   estado: 'pendente' | 'ativa' | 'suspensa';
   createdAt: string;
   usuariosAtivos: number;
@@ -137,6 +144,7 @@ interface Evento {
   estado: string;
   aldeiaId: string;
   aldeia?: { nome: string };
+  imageUrl?: string;
   imagemBase64?: string;
   _count?: { jogos: number };
 }
@@ -248,8 +256,12 @@ function AldeiasTable({ aldeias, onEdit, onVer, onDelete }: { aldeias: Aldeia[];
             >
               <td className="p-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-green-500 rounded-xl flex items-center justify-center text-white font-bold">
-                    {aldeia.nome.charAt(0)}
+                  <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-green-500 rounded-xl flex items-center justify-center text-white font-bold overflow-hidden border">
+                    {(aldeia.logoUrl || aldeia.logoBase64) ? (
+                      <img src={aldeia.logoUrl || aldeia.logoBase64} alt={aldeia.nome} className="w-full h-full object-cover" />
+                    ) : (
+                      aldeia.nome.charAt(0)
+                    )}
                   </div>
                   <div>
                     <p className="font-bold">{aldeia.nome}</p>
@@ -358,8 +370,13 @@ function ModalAldeia({ isOpen, onClose, onSave, aldeiaToEdit }: { isOpen: boolea
     telefone: '',
     localizacao: '',
     morada: '',
+    codigoPostal: '',
+    localidade: '',
+    descricao: '',
     logo: '',
-    estado: 'pendente'
+    logoUrl: '',
+    estado: 'pendente',
+    slug: ''
   });
 
   useEffect(() => {
@@ -370,9 +387,14 @@ function ModalAldeia({ isOpen, onClose, onSave, aldeiaToEdit }: { isOpen: boolea
         email: aldeiaToEdit.email || '',
         telefone: aldeiaToEdit.telefone || '',
         localizacao: aldeiaToEdit.localizacao || '',
-        morada: (aldeiaToEdit as any).morada || '',
-        logo: (aldeiaToEdit as any).logoBase64 || '',
-        estado: (aldeiaToEdit as any).estado || 'pendente'
+        morada: aldeiaToEdit.morada || '',
+        codigoPostal: aldeiaToEdit.codigoPostal || '',
+        localidade: aldeiaToEdit.localidade || '',
+        descricao: aldeiaToEdit.descricao || '',
+        logo: aldeiaToEdit.logoBase64 || '',
+        logoUrl: aldeiaToEdit.logoUrl || '',
+        estado: aldeiaToEdit.estado || 'pendente',
+        slug: aldeiaToEdit.slug || ''
       });
     } else {
       setForm({
@@ -382,40 +404,66 @@ function ModalAldeia({ isOpen, onClose, onSave, aldeiaToEdit }: { isOpen: boolea
         telefone: '',
         localizacao: '',
         morada: '',
+        codigoPostal: '',
+        localidade: '',
+        descricao: '',
         logo: '',
-        estado: 'pendente'
+        logoUrl: '',
+        estado: 'pendente',
+        slug: ''
       });
     }
   }, [aldeiaToEdit, isOpen]);
 
   const handleSubmit = () => {
-    // Validar campos básicos antes de enviar
     if (!form.nome || !form.email || !form.localizacao) {
       alert('Por favor preencha todos os campos obrigatórios (*)');
       return;
     }
-    // No frontend usamos 'logo', mas o backend espera 'logoBase64' no schema
     const dataToSend = { ...form, logoBase64: form.logo };
     onSave(dataToSend);
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="🏘️ Nova Aldeia / Organização">
+    <Modal isOpen={isOpen} onClose={onClose} title={aldeiaToEdit ? "🏘️ Editar Aldeia / Organização" : "🏘️ Nova Aldeia / Organização"}>
       <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium mb-1">Nome *</label>
-          <Input value={form.nome} onChange={(e: any) => setForm({ ...form, nome: e.target.value })} placeholder="Ex: Junta de Freguesia de Aldeia" />
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Nome *</label>
+            <Input value={form.nome} onChange={(e: any) => setForm({ ...form, nome: e.target.value })} placeholder="Ex: Junta de Freguesia" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Slug (URL)</label>
+            <Input value={form.slug} onChange={(e: any) => setForm({ ...form, slug: e.target.value })} placeholder="ex-junta-freguesia" />
+          </div>
         </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Tipo *</label>
-          <select className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl" value={form.tipoOrganizacao} onChange={(e: any) => setForm({ ...form, tipoOrganizacao: e.target.value })}>
-            <option value="aldeia">Aldeia</option>
-            <option value="escola">Escola</option>
-            <option value="clube">Clube/Associação</option>
-            <option value="comite">Comité de Festas</option>
-            <option value="outro">Outro</option>
-          </select>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Tipo *</label>
+            <select className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl" value={form.tipoOrganizacao} onChange={(e: any) => setForm({ ...form, tipoOrganizacao: e.target.value })}>
+              <option value="aldeia">Aldeia</option>
+              <option value="escola">Escola</option>
+              <option value="associacao_pais">Assoc. Pais</option>
+              <option value="clube">Clube/Associação</option>
+              <option value="comite">Comité de Festas</option>
+              <option value="outro">Outro</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Estado *</label>
+            <select
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl"
+              value={form.estado}
+              onChange={(e: any) => setForm({ ...form, estado: e.target.value })}
+            >
+              <option value="pendente">Pendente</option>
+              <option value="ativa">Ativa</option>
+              <option value="suspensa">Suspensa</option>
+            </select>
+          </div>
         </div>
+
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium mb-1">Email *</label>
@@ -426,22 +474,39 @@ function ModalAldeia({ isOpen, onClose, onSave, aldeiaToEdit }: { isOpen: boolea
             <Input type="tel" value={form.telefone} onChange={(e: any) => setForm({ ...form, telefone: e.target.value })} placeholder="912 345 678" />
           </div>
         </div>
+
         <div>
-          <label className="block text-sm font-medium mb-1">Localização *</label>
+          <label className="block text-sm font-medium mb-1">Descrição</label>
+          <textarea
+            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-indigo-500 focus:outline-none transition-colors"
+            value={form.descricao}
+            onChange={(e) => setForm({ ...form, descricao: e.target.value })}
+            placeholder="Breve descrição da organização..."
+            rows={2}
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-1">Localização Principal *</label>
           <Input value={form.localizacao} onChange={(e: any) => setForm({ ...form, localizacao: e.target.value })} placeholder="Ex: Castelo de Paiva, Portugal" />
         </div>
+
         <div>
-          <label className="block text-sm font-medium mb-1">Estado *</label>
-          <select
-            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl"
-            value={form.estado}
-            onChange={(e: any) => setForm({ ...form, estado: e.target.value })}
-          >
-            <option value="pendente">Pendente</option>
-            <option value="ativa">Ativa</option>
-            <option value="suspensa">Suspensa</option>
-          </select>
+          <label className="block text-sm font-medium mb-1">Morada Completa</label>
+          <Input value={form.morada} onChange={(e: any) => setForm({ ...form, morada: e.target.value })} placeholder="Rua, Nº, Andar..." />
         </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Código Postal</label>
+            <Input value={form.codigoPostal} onChange={(e: any) => setForm({ ...form, codigoPostal: e.target.value })} placeholder="0000-000" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Localidade</label>
+            <Input value={form.localidade} onChange={(e: any) => setForm({ ...form, localidade: e.target.value })} placeholder="Cidade/Vila" />
+          </div>
+        </div>
+
         <div>
           <label className="block text-sm font-medium mb-2">Logo da Aldeia (Opcional)</label>
           <input
@@ -459,9 +524,10 @@ function ModalAldeia({ isOpen, onClose, onSave, aldeiaToEdit }: { isOpen: boolea
             }}
             className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
           />
-          {form.logo && (
-            <div className="mt-2">
-              <img src={form.logo} alt="Preview" className="w-16 h-16 object-contain rounded border" />
+          {(form.logo || form.logoUrl) && (
+            <div className="mt-2 flex items-center gap-2">
+              <img src={form.logo || form.logoUrl} alt="Preview" className="w-16 h-16 object-contain rounded border bg-gray-50" />
+              <p className="text-xs text-gray-500">{form.logo ? 'Nova imagem carregada' : 'Imagem atual'}</p>
             </div>
           )}
         </div>
@@ -627,7 +693,8 @@ function ModalEvento({ isOpen, onClose, onSave, aldeias, eventoToEdit }: { isOpe
     dataFim: '',
     estado: 'ativo',
     aldeiaId: '',
-    imagem: ''
+    imagem: '',
+    imagemUrl: ''
   });
 
   useEffect(() => {
@@ -639,16 +706,21 @@ function ModalEvento({ isOpen, onClose, onSave, aldeias, eventoToEdit }: { isOpe
         dataFim: eventoToEdit.dataFim?.split('T')[0] || '',
         estado: eventoToEdit.estado,
         aldeiaId: eventoToEdit.aldeiaId,
-        imagem: eventoToEdit.imagemBase64 || ''
+        imagem: (eventoToEdit as any).imagemBase64 || '',
+        imagemUrl: (eventoToEdit as any).imageUrl || ''
       });
     } else {
-      setForm({ nome: '', descricao: '', dataInicio: '', dataFim: '', estado: 'ativo', aldeiaId: '', imagem: '' });
+      setForm({ nome: '', descricao: '', dataInicio: '', dataFim: '', estado: 'ativo', aldeiaId: '', imagem: '', imagemUrl: '' });
     }
   }, [eventoToEdit, isOpen]);
 
   const handleSubmit = () => {
-    onSave(form);
-    onClose();
+    if (!form.nome || !form.aldeiaId || !form.dataInicio) {
+      alert('Preencha os campos obrigatórios (*)');
+      return;
+    }
+    const dataToSend = { ...form, imagemBase64: form.imagem };
+    onSave(dataToSend);
   };
 
   return (
@@ -674,6 +746,30 @@ function ModalEvento({ isOpen, onClose, onSave, aldeias, eventoToEdit }: { isOpe
             <label className="block text-sm font-medium mb-1">Data Fim</label>
             <Input type="date" value={form.dataFim} onChange={(e: any) => setForm({ ...form, dataFim: e.target.value })} />
           </div>
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-2">Imagem do Evento (Opcional)</label>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                  setForm({ ...form, imagem: reader.result as string });
+                };
+                reader.readAsDataURL(file);
+              }
+            }}
+            className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+          />
+          {(form.imagem || form.imagemUrl) && (
+            <div className="mt-2 flex items-center gap-2">
+              <img src={form.imagem || form.imagemUrl} alt="Preview" className="w-24 h-16 object-cover rounded border bg-gray-50" />
+              <p className="text-xs text-gray-500">{form.imagem ? 'Nova imagem carregada' : 'Imagem atual'}</p>
+            </div>
+          )}
         </div>
         <UIButton onClick={handleSubmit} className="w-full bg-gradient-to-r from-amber-500 to-orange-500">
           {eventoToEdit ? "Guardar Alterações" : "Criar Evento"}
@@ -912,7 +1008,7 @@ export function SuperAdminDashboard() {
         confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
       } else {
         const err = await res.json();
-        alert(`Erro ao salvar aldeia: ${err.error || 'Erro desconhecido'}`);
+        alert(`Erro ao salvar aldeia: ${err.error || 'Erro desconhecido'}${err.details ? `\nDetalhes: ${err.details}` : ''}`);
       }
     } catch (e) {
       console.error('Erro a salvar aldeia:', e);
@@ -1363,7 +1459,7 @@ export function SuperAdminDashboard() {
                     {eventos.map(e => (
                       <UICard key={e.id} className="overflow-hidden">
                         <div className="h-32 bg-gray-200 relative">
-                          {e.imagemBase64 && <img src={e.imagemBase64} alt={e.titulo} className="w-full h-full object-cover" />}
+                          {(e.imageUrl || e.imagemBase64) && <img src={e.imageUrl || e.imagemBase64} alt={e.titulo} className="w-full h-full object-cover" />}
                           <div className="absolute top-2 right-2 flex gap-1">
                             <button onClick={() => { setEventoEditing(e); setShowModalEvento(true); }} className="p-2 bg-white/90 rounded-lg shadow hover:bg-white"><Edit className="w-4 h-4" /></button>
                             <button onClick={() => handleDeleteEvento(e.id)} className="p-2 bg-white/90 rounded-lg shadow hover:bg-red-50 text-red-600"><Trash2 className="w-4 h-4" /></button>

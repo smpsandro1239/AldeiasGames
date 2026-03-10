@@ -47,6 +47,9 @@ model Aldeia {
   morada              String?
   codigoPostal        String?
   localidade          String?
+  email               String?
+  telefone            String?
+  estado              String    @default("pendente")
   autorizacaoCM       Boolean   @default(false)
   numeroAlvara        String?
   createdAt           DateTime  @default(now())

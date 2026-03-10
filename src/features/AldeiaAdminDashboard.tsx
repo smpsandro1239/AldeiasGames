@@ -214,7 +214,7 @@ export function AldeiaAdminDashboard({ aldeiaId, aldeiaNome }: AldeiaAdminDashbo
       setLoading(true);
       try {
         const token = localStorage.getItem('token');
-        
+
         // Fetch aldeia info
         const aldeiaRes = await fetch(`/api/aldeias/${aldeiaId}`, {
           headers: { Authorization: `Bearer ${token}` }
@@ -312,7 +312,7 @@ export function AldeiaAdminDashboard({ aldeiaId, aldeiaNome }: AldeiaAdminDashbo
         setLoading(false);
       }
     }
-    
+
     if (aldeiaId) {
       fetchData();
     }
@@ -340,7 +340,7 @@ export function AldeiaAdminDashboard({ aldeiaId, aldeiaNome }: AldeiaAdminDashbo
       const token = localStorage.getItem('token');
       const res = await fetch('/api/eventos', {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
@@ -366,7 +366,7 @@ export function AldeiaAdminDashboard({ aldeiaId, aldeiaNome }: AldeiaAdminDashbo
       const token = localStorage.getItem('token');
       const res = await fetch('/api/users', {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
@@ -389,7 +389,7 @@ export function AldeiaAdminDashboard({ aldeiaId, aldeiaNome }: AldeiaAdminDashbo
 
   const handleExecutarSorteio = async (jogoId: string) => {
     if (!confirm('Tem certeza que deseja executar o sorteio? Esta ação não pode ser desfeita.')) return;
-    
+
     try {
       const token = localStorage.getItem('token');
       const res = await fetch(`/api/sorteios/${jogoId}`, {
@@ -413,7 +413,7 @@ export function AldeiaAdminDashboard({ aldeiaId, aldeiaNome }: AldeiaAdminDashbo
       const token = localStorage.getItem('token');
       const res = await fetch(`/api/participacoes/${participacaoId}/alterar`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
@@ -474,8 +474,12 @@ export function AldeiaAdminDashboard({ aldeiaId, aldeiaNome }: AldeiaAdminDashbo
                 <Bell className="w-5 h-5 text-gray-600" />
                 <span className="absolute top-1 right-1 w-3 h-3 bg-red-500 rounded-full" />
               </button>
-              <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-500 rounded-full flex items-center justify-center text-white font-bold">
-                {aldeiaNome?.charAt(0) || 'A'}
+              <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-500 rounded-full flex items-center justify-center text-white font-bold overflow-hidden border">
+                {(aldeiaInfo?.logoUrl || aldeiaInfo?.logoBase64) ? (
+                  <img src={aldeiaInfo.logoUrl || aldeiaInfo.logoBase64} alt={aldeiaNome} className="w-full h-full object-cover" />
+                ) : (
+                  aldeiaNome?.charAt(0) || 'A'
+                )}
               </div>
             </div>
           </div>
@@ -603,7 +607,7 @@ export function AldeiaAdminDashboard({ aldeiaId, aldeiaNome }: AldeiaAdminDashbo
                             <Eye className="w-4 h-4 inline mr-1" /> Ver
                           </button>
                           {camp.estado === 'ativa' && camp.totalVendas > 0 && (
-                            <button 
+                            <button
                               onClick={() => handleExecutarSorteio(camp.id)}
                               className="flex-1 py-2 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-lg text-sm"
                             >
@@ -709,13 +713,13 @@ export function AldeiaAdminDashboard({ aldeiaId, aldeiaNome }: AldeiaAdminDashbo
                                 <div className="flex gap-2">
                                   {p.estado === 'pendente' && (
                                     <>
-                                      <button 
+                                      <button
                                         onClick={() => handleAlterarParticipacao(p.id, 'pago', 'Confirmado por admin')}
                                         className="px-3 py-1 bg-green-100 text-green-700 rounded-lg text-sm hover:bg-green-200"
                                       >
                                         Validar
                                       </button>
-                                      <button 
+                                      <button
                                         onClick={() => handleAlterarParticipacao(p.id, 'cancelado', 'Cancelado por admin')}
                                         className="px-3 py-1 bg-red-100 text-red-700 rounded-lg text-sm hover:bg-red-200"
                                       >
@@ -750,14 +754,13 @@ export function AldeiaAdminDashboard({ aldeiaId, aldeiaNome }: AldeiaAdminDashbo
                     <div className="space-y-4">
                       {alteracoes.map((alt) => (
                         <div key={alt.id} className="flex items-start gap-4 p-4 bg-gray-50 rounded-xl">
-                          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                            alt.tipo === 'criacao' ? 'bg-green-100 text-green-600' :
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${alt.tipo === 'criacao' ? 'bg-green-100 text-green-600' :
                             alt.tipo === 'alteracao' ? 'bg-blue-100 text-blue-600' :
-                            'bg-red-100 text-red-600'
-                          }`}>
+                              'bg-red-100 text-red-600'
+                            }`}>
                             {alt.tipo === 'criacao' ? <Plus className="w-5 h-5" /> :
-                             alt.tipo === 'alteracao' ? <Edit className="w-5 h-5" /> :
-                             <Trash2 className="w-5 h-5" />}
+                              alt.tipo === 'alteracao' ? <Edit className="w-5 h-5" /> :
+                                <Trash2 className="w-5 h-5" />}
                           </div>
                           <div className="flex-1">
                             <p className="font-medium">{alt.descricao}</p>
@@ -837,16 +840,16 @@ export function AldeiaAdminDashboard({ aldeiaId, aldeiaNome }: AldeiaAdminDashbo
       </div>
 
       {/* Modals */}
-      <ModalCriarCampanha 
-        isOpen={showCriarCampanha} 
-        onClose={() => setShowCriarCampanha(false)} 
-        onSave={handleCriarCampanha} 
+      <ModalCriarCampanha
+        isOpen={showCriarCampanha}
+        onClose={() => setShowCriarCampanha(false)}
+        onSave={handleCriarCampanha}
       />
-      
-      <ModalCriarVendedor 
-        isOpen={showCriarVendedor} 
-        onClose={() => setShowCriarVendedor(false)} 
-        onSave={handleCriarVendedor} 
+
+      <ModalCriarVendedor
+        isOpen={showCriarVendedor}
+        onClose={() => setShowCriarVendedor(false)}
+        onSave={handleCriarVendedor}
       />
     </div>
   );
@@ -857,12 +860,16 @@ export function AldeiaAdminDashboard({ aldeiaId, aldeiaNome }: AldeiaAdminDashbo
 // ============================================
 
 function ModalCriarCampanha({ isOpen, onClose, onSave }: { isOpen: boolean; onClose: () => void; onSave: (data: any) => void }) {
-  const [form, setForm] = useState({ titulo: '', tipo: 'raspadinha', preco: 2.50 });
+  const [form, setForm] = useState({ titulo: '', tipo: 'raspadinha', preco: 2.50, imagem: '' });
 
   const handleSubmit = () => {
-    onSave(form);
+    if (!form.titulo) {
+      alert('O título é obrigatório');
+      return;
+    }
+    onSave({ ...form, imagemBase64: form.imagem });
     onClose();
-    setForm({ titulo: '', tipo: 'raspadinha', preco: 2.50 });
+    setForm({ titulo: '', tipo: 'raspadinha', preco: 2.50, imagem: '' });
   };
 
   if (!isOpen) return null;
@@ -890,6 +897,29 @@ function ModalCriarCampanha({ isOpen, onClose, onSave }: { isOpen: boolean; onCl
           <div>
             <label className="block text-sm font-medium mb-1">Preço por Jogo (€) *</label>
             <Input type="number" step="0.10" value={form.preco} onChange={(e: any) => setForm({ ...form, preco: parseFloat(e.target.value) })} placeholder="2.50" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-2">Imagem do Evento (Opcional)</label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  const reader = new FileReader();
+                  reader.onloadend = () => {
+                    setForm({ ...form, imagem: reader.result as string });
+                  };
+                  reader.readAsDataURL(file);
+                }
+              }}
+              className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+            />
+            {form.imagem && (
+              <div className="mt-2">
+                <img src={form.imagem} alt="Preview" className="w-24 h-16 object-cover rounded border bg-gray-50" />
+              </div>
+            )}
           </div>
           <UIButton onClick={handleSubmit} className="w-full bg-gradient-to-r from-purple-500 to-pink-500">
             <PartyPopper className="w-4 h-4 mr-2" /> Criar Evento

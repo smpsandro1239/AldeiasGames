@@ -8,7 +8,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    
+
     const evento = await db.evento.findUnique({
       where: { id },
       include: {
@@ -46,7 +46,7 @@ export async function PATCH(
 ) {
   try {
     const user = await getUserFromRequest(request);
-    
+
     if (!user || !['super_admin', 'aldeia_admin'].includes(user.role)) {
       return NextResponse.json(
         { error: 'Não autorizado' },
@@ -56,7 +56,13 @@ export async function PATCH(
 
     const { id } = await params;
     const body = await request.json();
-    const { nome, descricao, dataInicio, dataFim, estado, imagemBase64 } = body;
+    const { nome, descricao, dataInicio, dataFim, estado, imagemBase64, imageUrl } = body;
+
+    let finalImageUrl = imageUrl || null;
+    if (imagemBase64 && imagemBase64.startsWith('data:image/')) {
+      const { saveBase64Image } = await import('@/lib/storage');
+      finalImageUrl = await saveBase64Image(imagemBase64);
+    }
 
     const evento = await db.evento.update({
       where: { id },
@@ -66,7 +72,8 @@ export async function PATCH(
         dataInicio: dataInicio ? new Date(dataInicio) : undefined,
         dataFim: dataFim ? new Date(dataFim) : undefined,
         estado,
-        imagemBase64,
+        imageUrl: finalImageUrl,
+        imagemBase64: null,
       }
     });
 
@@ -86,7 +93,7 @@ export async function DELETE(
 ) {
   try {
     const user = await getUserFromRequest(request);
-    
+
     if (!user || !['super_admin', 'aldeia_admin'].includes(user.role)) {
       return NextResponse.json(
         { error: 'Não autorizado' },
@@ -95,7 +102,7 @@ export async function DELETE(
     }
 
     const { id } = await params;
-    
+
     await db.evento.delete({
       where: { id }
     });

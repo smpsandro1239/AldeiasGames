@@ -5,55 +5,27 @@ import { saveBase64Image } from '@/lib/storage';
 import { aldeiaSchema } from '@/lib/validations';
 import { ZodError } from 'zod';
 
-export async function GET(request: Request) {
+export async function GET() {
   try {
-    const user = await getUserFromRequest(request);
-    
-    let aldeias;
-    if (user?.role === 'super_admin') {
-      aldeias = await db.aldeia.findMany({
-        include: {
-          _count: {
-            select: { eventos: true, users: true, premios: true }
-          }
-        },
-        orderBy: { createdAt: 'desc' }
-      });
-    } else if (user?.role === 'aldeia_admin' && user.aldeiaId) {
-      aldeias = await db.aldeia.findMany({
-        where: { id: user.aldeiaId },
-        include: {
-          _count: {
-            select: { eventos: true, users: true, premios: true }
-          }
+    const aldeias = await db.aldeia.findMany({
+      include: {
+        _count: {
+          select: { eventos: true, users: true }
         }
-      });
-    } else {
-      aldeias = await db.aldeia.findMany({
-        where: { eventos: { some: { estado: 'ativo' } } },
-        select: {
-          id: true,
-          nome: true,
-          descricao: true,
-          localizacao: true,
-          logoUrl: true,
-          logoBase64: true,
-          tipoOrganizacao: true,
-          slug: true,
-        }
-      });
-    }
-
+      },
+      orderBy: { createdAt: 'desc' }
+    });
     return NextResponse.json(aldeias);
   } catch (error) {
     console.error('Erro ao buscar aldeias:', error);
-    return NextResponse.json({ error: 'Erro ao buscar aldeias' }, { status: 500 });
+    return NextResponse.json({ error: 'Erro ao buscar organizações' }, { status: 500 });
   }
 }
 
 export async function POST(request: Request) {
   try {
     const user = await getUserFromRequest(request);
+
     if (!user || user.role !== 'super_admin') {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 403 });
     }
@@ -61,11 +33,10 @@ export async function POST(request: Request) {
     const body = await request.json();
     const validatedData = aldeiaSchema.parse(body);
 
-    const { 
-      nome, 
+    const {
+      nome,
       logoBase64,
       slug,
-      tipoOrganizacao,
       // ... rest of fields
     } = validatedData;
 
@@ -88,26 +59,35 @@ export async function POST(request: Request) {
 
     // Processar imagem se existir
     let finalLogoUrl = body.logoUrl || null;
-    if (logoBase64) {
+    if (logoBase64 && logoBase64.startsWith('data:image/')) {
       finalLogoUrl = await saveBase64Image(logoBase64);
     }
 
+    const createData: any = {
+      ...validatedData,
+      slug: generatedSlug,
+      logoUrl: finalLogoUrl,
+      logoBase64: null,
+    };
+
+    // Remover campos undefined
+    Object.keys(createData).forEach(key =>
+      createData[key] === undefined && delete createData[key]
+    );
+
     const aldeia = await db.aldeia.create({
-      data: {
-        ...validatedData,
-        slug: generatedSlug,
-        logoUrl: finalLogoUrl,
-        // Mantemos logoBase64 vazio ou opcional para não encher a DB
-        logoBase64: null
-      }
+      data: createData
     });
 
     return NextResponse.json(aldeia, { status: 201 });
-  } catch (error) {
+  } catch (error: any) {
     if (error instanceof ZodError) {
       return NextResponse.json({ error: error.issues[0].message }, { status: 400 });
     }
-    console.error('Erro ao criar organização:', error);
-    return NextResponse.json({ error: 'Erro ao criar organização' }, { status: 500 });
+    console.error('Erro detalhado ao criar aldeia:', error);
+    return NextResponse.json({
+      error: 'Erro ao criar organização',
+      details: error.message
+    }, { status: 500 });
   }
 }

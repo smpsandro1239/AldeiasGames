@@ -2,11 +2,12 @@
  * RaspadinhaGame.tsx
  * Jogo de Raspadinha Digital - Design Premium
  * Estilo: Festivo, excitement, reward
+ * Features: Imagens personalizáveis, aspeto real de raspadinha
  */
 
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Sparkles, 
@@ -19,7 +20,10 @@ import {
   Volume2,
   VolumeX,
   CheckCircle,
-  XCircle
+  XCircle,
+  Upload,
+  Image as ImageIcon,
+  PartyPopper
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { UIButton } from '@/components/ui-components';
@@ -41,6 +45,8 @@ interface RaspadinhaGameProps {
   premios: Premio[];
   config?: {
     simbolos?: string[];
+    imagens?: string[];  // URLs das imagens para os símbolos
+    imagemFesta?: string;  // Imagem de fundo/tema da festa
     cores?: {
       primario: string;
       secundario: string;
@@ -53,6 +59,7 @@ interface AreaOculta {
   id: number;
   revelada: boolean;
   simbolo: string;
+  imagem: string;  // URL da imagem
   premio: string;
 }
 
@@ -84,23 +91,39 @@ const prizeReveal = {
   }
 } as const;
 
+const winnerBanner = {
+  hidden: { opacity: 0, y: -50, scale: 0.8 },
+  visible: { 
+    opacity: 1, 
+    y: 0,
+    scale: 1,
+    transition: { type: "spring", stiffness: 300, damping: 20 }
+  }
+} as const;
+
 // ============================================
 // COMPONENTES
 // ============================================
 
 // --------------------------------------------
-// AREA DE RASPAR (SCRATCH AREA)
+// ÁREA DE RASPAR COM ASPETO REAL (SCRATCH AREA)
 // --------------------------------------------
 function ScratchArea({ 
   areas, 
-  onScratch 
+  onScratch,
+  mostrandoResultado,
+  simboloVencedor
 }: { 
   areas: AreaOculta[]; 
-  onScratch: (id: number) => void 
+  onScratch: (id: number) => void;
+  mostrandoResultado?: boolean;
+  simboloVencedor?: string;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [scratchedIds, setScratchedIds] = useState<Set<number>>(new Set());
 
+  // tracking scratched areas via canvas-like effect
   const handleTouchMove = (e: React.TouchEvent) => {
     if (!containerRef.current) return;
     
@@ -109,7 +132,8 @@ function ScratchArea({
     
     if (element?.classList.contains('scratch-area')) {
       const id = parseInt(element.getAttribute('data-id') || '0');
-      if (id && !areas.find(a => a.id === id)?.revelada) {
+      if (id && !areas.find(a => a.id === id)?.revelada && !scratchedIds.has(id)) {
+        setScratchedIds(prev => new Set(prev).add(id));
         onScratch(id);
       }
     }
@@ -122,9 +146,17 @@ function ScratchArea({
     
     if (element?.classList.contains('scratch-area')) {
       const id = parseInt(element.getAttribute('data-id') || '0');
-      if (id && !areas.find(a => a.id === id)?.revelada) {
+      if (id && !areas.find(a => a.id === id)?.revelada && !scratchedIds.has(id)) {
+        setScratchedIds(prev => new Set(prev).add(id));
         onScratch(id);
       }
+    }
+  };
+
+  const handleClick = (id: number) => {
+    if (!areas.find(a => a.id === id)?.revelada && !scratchedIds.has(id)) {
+      setScratchedIds(prev => new Set(prev).add(id));
+      onScratch(id);
     }
   };
 
@@ -138,42 +170,151 @@ function ScratchArea({
       onMouseMove={handleMouseMove}
       onTouchMove={handleTouchMove}
     >
-      {/* Layer prateado de cobertura */}
-      <div className="grid grid-cols-3 gap-2">
-        {areas.map((area) => (
-          <motion.button
-            key={area.id}
-            data-id={area.id}
-            className={`scratch-area aspect-square rounded-xl text-4xl flex items-center justify-center transition-all duration-300 ${
-              area.revelada 
-                ? 'bg-transparent' 
-                : 'bg-gradient-to-br from-gray-300 to-gray-400 hover:from-gray-200 hover:to-gray-300 cursor-crosshair'
-            }`}
-            whileHover={!area.revelada ? { scale: 1.05 } : {}}
-            whileTap={!area.revelada ? { scale: 0.95 } : {}}
-            onClick={() => !area.revelada && onScratch(area.id)}
-            disabled={area.revelada}
-          >
-            {area.revelada ? (
-              <motion.span
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                className="text-5xl"
+      {/* Container com aspeto de raspadinha real */}
+      <div className="bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl p-3 shadow-2xl border-4 border-gray-300">
+        {/* Texto "RASPE AQUI" */}
+        {!mostrandoResultado && (
+          <div className="text-center mb-3">
+            <p className="text-gray-400 text-xs font-bold tracking-widest uppercase">
+              ✨ Raspe para revelar ✨
+            </p>
+          </div>
+        )}
+        
+        {/* Grid de áreas - estilo raspadinha real */}
+        <div className="grid grid-cols-3 gap-2">
+          {areas.map((area) => {
+            const isWinnerSymbol = area.simbolo === simboloVencedor && mostrandoResultado;
+            
+            return (
+              <motion.button
+                key={area.id}
+                data-id={area.id}
+                className={`scratch-area aspect-square rounded-xl flex items-center justify-center transition-all relative overflow-hidden ${
+                  area.revelada 
+                    ? 'bg-white shadow-inner' 
+                    : 'cursor-crosshair hover:scale-[1.02]'
+                }`}
+                style={{
+                  background: area.revelada 
+                    ? '#fff' 
+                    : 'linear-gradient(135deg, #C0C0C0 0%, #A8A8A8 50%, #B8B8B8 100%)',
+                  boxShadow: area.revelada
+                    ? 'inset 0 2px 4px rgba(0,0,0,0.1)'
+                    : '0 4px 8px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.4)'
+                }}
+                whileHover={!area.revelada ? { scale: 1.02 } : {}}
+                whileTap={!area.revelada ? { scale: 0.98 } : {}}
+                onClick={() => !area.revelada && handleClick(area.id)}
+                disabled={area.revelada}
               >
-                {area.simbolo}
-              </motion.span>
-            ) : (
-              <Sparkles className="w-8 h-8 text-gray-500" />
-            )}
-          </motion.button>
-        ))}
+                {area.revelada ? (
+                  <motion.div
+                    initial={{ scale: 0, rotate: -180 }}
+                    animate={{ scale: 1, rotate: 0 }}
+                    transition={{ type: "spring", bounce: 0.4 }}
+                    className="w-full h-full flex items-center justify-center p-1"
+                  >
+                    {area.imagem ? (
+                      <div className={`relative w-full h-full flex items-center justify-center ${isWinnerSymbol ? 'bg-green-100 rounded-lg' : ''}`}>
+                        {isWinnerSymbol && (
+                          <motion.div
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            className="absolute -top-1 -right-1 z-10"
+                          >
+                            <div className="bg-green-500 text-white rounded-full p-1">
+                              <CheckCircle className="w-3 h-3" />
+                            </div>
+                          </motion.div>
+                        )}
+                        <img 
+                          src={area.imagem} 
+                          alt={area.simbolo}
+                          className="max-w-[90%] max-h-[90%] object-contain"
+                        />
+                      </div>
+                    ) : (
+                      <span className="text-4xl">{area.simbolo}</span>
+                    )}
+                  </motion.div>
+                ) : (
+                  // Efeito de textura prateada
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-full h-full bg-gradient-to-br from-gray-300 via-gray-400 to-gray-300 opacity-80" 
+                      style={{
+                        backgroundImage: `repeating-linear-gradient(
+                          45deg,
+                          transparent,
+                          transparent 2px,
+                          rgba(255,255,255,0.1) 2px,
+                          rgba(255,255,255,0.1) 4px
+                        )`
+                      }}
+                    />
+                    <Sparkles className="absolute w-6 h-6 text-gray-500/50" />
+                  </div>
+                )}
+              </motion.button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
 }
 
 // --------------------------------------------
-// RESULTADO VITÓRIA
+// BANNER DE VITÓRIA (informação no topo)
+// --------------------------------------------
+function WinnerBanner({ 
+  premio,
+  simbolo 
+}: { 
+  premio: string | null; 
+  simbolo: string;
+}) {
+  const isWinner = premio && premio !== "SEM PRÉMIO";
+  
+  if (!isWinner) return null;
+
+  return (
+    <motion.div
+      initial="hidden"
+      animate="visible"
+      variants={winnerBanner}
+      className="bg-gradient-to-r from-amber-400 via-yellow-500 to-amber-400 rounded-2xl p-4 shadow-2xl mb-4 border-2 border-amber-300"
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="bg-white rounded-full p-2 shadow-lg">
+            <Trophy className="w-8 h-8 text-amber-600" />
+          </div>
+          <div>
+            <p className="text-amber-900 font-black text-xl uppercase tracking-wide">
+              🎉 GANHOU! 🎉
+            </p>
+            <p className="text-amber-800 font-bold">
+              {premio}
+            </p>
+          </div>
+        </div>
+        <div className="text-4xl">
+          <PartyPopper className="w-10 h-10 text-amber-600" />
+        </div>
+      </div>
+      
+      <div className="mt-3 bg-white/30 rounded-lg p-2 text-center">
+        <p className="text-amber-900 font-medium text-sm">
+          3 símbolos iguais: <span className="font-bold">{simbolo}</span>
+        </p>
+      </div>
+    </motion.div>
+  );
+}
+
+// --------------------------------------------
+// RESULTADO VITÓRIA (MODAL)
 // --------------------------------------------
 function VictoryScreen({ 
  premio, 
@@ -300,11 +441,11 @@ function VictoryScreen({
 // --------------------------------------------
 // INSTRUÇÕES
 // --------------------------------------------
-function Instrucoes({ onComecar }: { onComecar: () => void }) {
+function Instrucoes({ onComecar, imagemFesta }: { onComecar: () => void; imagemFesta?: string }) {
   const pasos = [
     { icon: Coins, text: "Escolhe a tua raspadinha" },
     { icon: Sparkles, text: "Raspa as 9 áreas com o dedo" },
-    { icon: Trophy, text: "Se revelares 3 símbolos iguais, GANHAS!" }
+    { icon: Trophy, text: "Se revelares 3 imagens iguais, GANHAS!" }
   ];
 
   return (
@@ -314,7 +455,27 @@ function Instrucoes({ onComecar }: { onComecar: () => void }) {
         animate={{ y: 0, opacity: 1 }}
         className="mb-8"
       >
-        <Sparkles className="w-16 h-16 text-purple-500 mx-auto mb-4" />
+        {/* Imagem da festa se existir */}
+        {imagemFesta && (
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="mb-4 relative"
+          >
+            <img 
+              src={imagemFesta} 
+              alt="Festa" 
+              className="w-32 h-32 mx-auto rounded-2xl object-cover shadow-lg border-4 border-purple-300"
+            />
+            <div className="absolute -bottom-2 -right-2 bg-purple-500 text-white rounded-full p-2">
+              <PartyPopper className="w-4 h-4" />
+            </div>
+          </motion.div>
+        )}
+        
+        {!imagemFesta && (
+          <Sparkles className="w-16 h-16 text-purple-500 mx-auto mb-4" />
+        )}
         <h2 className="text-3xl font-black text-gray-800">Como Jogar</h2>
         <p className="text-gray-600 mt-2">Raspa e ganha prémios!</p>
       </motion.div>
@@ -366,27 +527,47 @@ export function RaspadinhaGame({
   const [loading, setLoading] = useState(false);
   const [participacaoId, setParticipacaoId] = useState<string | null>(null);
   const [ganhou, setGanhou] = useState(false);
+  const [simboloVencedor, setSimboloVencedor] = useState<string>('');
 
-  // Obter símbolos da config ou usar default
+  // Obter símbolos e imagens da config
   const simbolos = config?.simbolos || ['⭐', '💰', '🎁', '🍀', '🔥', '💎'];
+  const imagens = config?.imagens || [];
+  const imagemFesta = config?.imagemFesta;
 
   // Gerar áreas aleatórias (fallback se API não responder)
   const gerarAreas = () => {
     const premiacoes = ['SEM PRÉMIO', '1€', '2€', '5€', '10€', '20€', '50€', '100€'];
     const novoPremio = premiacoes[Math.floor(Math.random() * 4)];
     
-    const novasAreas: AreaOculta[] = Array(9).fill(null).map((_, i) => ({
-      id: i,
-      revelada: false,
-      simbolo: i === 4 ? '⭐' : simbolos[Math.floor(Math.random() * simbolos.length)],
-      premio: i === 4 ? novoPremio : 'SEM PRÉMIO'
-    }));
+    // Escolher símbolo vencedor
+    const simboloVencedorLocal = simbolos[Math.floor(Math.random() * simbolos.length)];
+    
+    // Criar 3 posições vencedoras e 6 normais
+    const posicoesVencedoras = [0, 1, 2].sort(() => Math.random() - 0.5).slice(0, 3);
+    
+    const novasAreas: AreaOculta[] = Array(9).fill(null).map((_, i) => {
+      const isVencedora = posicoesVencedoras.includes(i);
+      const simbolo = isVencedora ? simboloVencedorLocal : simbolos[Math.floor(Math.random() * simbolos.length)];
+      const imagemIndex = simbolos.indexOf(simbolo);
+      
+      return {
+        id: i,
+        revelada: false,
+        simbolo,
+        imagem: imagens[imagemIndex] || '',  // Usar imagem se disponível
+        premio: isVencedora ? novoPremio : 'SEM PRÉMIO'
+      };
+    });
     
     setAreas(novasAreas);
   };
 
   const handleComecar = async () => {
     setLoading(true);
+    setSimboloVencedor('');
+    setPremiacao(null);
+    setGanhou(false);
+    
     try {
       // Criar participação via API
       const response = await fetch(`/api/jogos/raspadinha/${jogoId}/jogar`, {
@@ -405,6 +586,7 @@ export function RaspadinhaGame({
             id: i,
             revelada: false,
             simbolo,
+            imagem: imagens[simbolos.indexOf(simbolo)] || '',
             premio: 'SEM PRÉMIO'
           }));
           
@@ -445,8 +627,10 @@ export function RaspadinhaGame({
     // Se 3 iguais, verificar com API
     const tresIguais = Object.values(contagem).find(c => c >= 3);
     if (tresIguais) {
-      const simboloVencedor = Object.keys(contagem).find(s => contagem[s] >= 3);
-      const areaVencedora = novasAreas.find(a => a.simbolo === simboloVencedor);
+      const simboloVencedorLocal = Object.keys(contagem).find(s => contagem[s] >= 3);
+      const areaVencedora = novasAreas.find(a => a.simbolo === simboloVencedorLocal);
+      
+      setSimboloVencedor(simboloVencedorLocal || '');
       
       setLoading(true);
       try {
@@ -467,11 +651,21 @@ export function RaspadinhaGame({
           }
         } else {
           setPremiacao(areaVencedora?.premio || 'PRÉMIO!');
+          if (areaVencedora?.premio && areaVencedora?.premio !== 'SEM PRÉMIO') {
+            setGanhou(true);
+          }
         }
+        
+        // Revelar todas as áreas para mostrar o resultado
+        setAreas(novasAreas.map(a => ({ ...a, revelada: true })));
         setGameState('resultado');
       } catch (error) {
         console.error('Erro ao participar:', error);
         setPremiacao(areaVencedora?.premio || 'PRÉMIO!');
+        if (areaVencedora?.premio && areaVencedora?.premio !== 'SEM PRÉMIO') {
+          setGanhou(true);
+        }
+        setAreas(novasAreas.map(a => ({ ...a, revelada: true })));
         setGameState('resultado');
       }
       setLoading(false);
@@ -482,6 +676,8 @@ export function RaspadinhaGame({
     setGameState('instrucoes');
     setAreas([]);
     setPremiacao(null);
+    setGanhou(false);
+    setSimboloVencedor('');
   };
 
   const handlePartilhar = () => {
@@ -494,22 +690,36 @@ export function RaspadinhaGame({
     }
   };
 
+  // Cores do tema
+  const corPrimaria = config?.cores?.primario || '#7C3AED';
+  const corSecundaria = config?.cores?.secundario || '#EC4899';
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-purple-50 via-pink-50 to-red-50 p-4">
       {/* Header do Jogo */}
       <motion.div 
-        className="max-w-md mx-auto mb-6"
+        className="max-w-md mx-auto mb-4"
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
       >
         <div className="bg-white rounded-3xl p-4 shadow-xl">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-xl font-black text-gray-800">{titulo}</h1>
-              <p className="text-gray-500 text-sm">Raspa e ganha!</p>
+            <div className="flex items-center gap-3">
+              {/* Imagem da festa no header */}
+              {imagemFesta && (
+                <img 
+                  src={imagemFesta} 
+                  alt="Festa" 
+                  className="w-12 h-12 rounded-xl object-cover border-2 border-purple-200"
+                />
+              )}
+              <div>
+                <h1 className="text-xl font-black text-gray-800">{titulo}</h1>
+                <p className="text-gray-500 text-sm">Raspa e ganha!</p>
+              </div>
             </div>
             <div className="text-right">
-              <p className="text-2xl font-black text-purple-600">€{preco.toFixed(2)}</p>
+              <p className="text-2xl font-black" style={{ color: corPrimaria }}>€{preco.toFixed(2)}</p>
             </div>
           </div>
         </div>
@@ -523,7 +733,7 @@ export function RaspadinhaGame({
               key="instrucoes"
               {...scratchMotion}
             >
-              <Instrucoes onComecar={handleComecar} />
+              <Instrucoes onComecar={handleComecar} imagemFesta={imagemFesta} />
             </motion.div>
           )}
 
@@ -532,15 +742,23 @@ export function RaspadinhaGame({
               key="jogando"
               {...scratchMotion}
             >
-              <div className="bg-white rounded-3xl p-6 shadow-2xl">
-                <p className="text-center text-gray-500 mb-4 font-medium">
-                  Raspa as áreas para revelar os símbolos!
+              {/* Banner de vitória (aparece no topo quando ganha) */}
+              <WinnerBanner premio={premiacao} simbolo={simboloVencedor} />
+              
+              <div className="bg-white rounded-3xl p-4 shadow-2xl">
+                <p className="text-center text-gray-500 mb-3 font-medium">
+                  ✨ Raspa as áreas para revelar os símbolos! ✨
                 </p>
-                <ScratchArea areas={areas} onScratch={handleScratch} />
+                <ScratchArea 
+                  areas={areas} 
+                  onScratch={handleScratch}
+                  mostrandoResultado={ganhou}
+                  simboloVencedor={simboloVencedor}
+                />
                 
-                <div className="mt-6 text-center">
-                  <p className="text-sm text-gray-400">
-                    Revela 3 símbolos iguais para ganhar! 🎯
+                <div className="mt-4 text-center">
+                  <p className="text-sm text-gray-400 bg-gray-100 rounded-full px-4 py-2 inline-block">
+                    🎯 Revela 3 símbolos iguais para ganhar!
                   </p>
                 </div>
               </div>
@@ -548,17 +766,70 @@ export function RaspadinhaGame({
           )}
 
           {gameState === 'resultado' && (
-            <VictoryScreen
-              premio={premiacao}
-              onNovamente={handleNovamente}
-              onPartilhar={handlePartilhar}
-            />
+            <>
+              {/* Banner de vitória no topo */}
+              <WinnerBanner premio={premiacao} simbolo={simboloVencedor} />
+              
+              {/* Área de resultado */}
+              <motion.div
+                key="resultado"
+                {...scratchMotion}
+              >
+                <div className="bg-white rounded-3xl p-4 shadow-2xl">
+                  <ScratchArea 
+                    areas={areas} 
+                    onScratch={() => {}}
+                    mostrandoResultado={true}
+                    simboloVencedor={simboloVencedor}
+                  />
+                  
+                  <div className="mt-4 text-center">
+                    {ganhou ? (
+                      <motion.div
+                        initial={{ scale: 0.8, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        className="bg-green-100 rounded-xl p-4"
+                      >
+                        <p className="text-green-700 font-bold text-lg">
+                          🎉 Parabéns! Ganhaste {premiacao}!
+                        </p>
+                      </motion.div>
+                    ) : (
+                      <div className="bg-gray-100 rounded-xl p-4">
+                        <p className="text-gray-600 font-medium">
+                          Não foi desta vez. Mais sorte na próxima!
+                        </p>
+                      </div>
+                    )}
+                    
+                    <div className="mt-4 flex gap-2 justify-center">
+                      <UIButton 
+                        className="bg-amber-500 hover:bg-amber-600"
+                        onClick={handleNovamente}
+                      >
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                        Jogar Novamente
+                      </UIButton>
+                      {ganhou && (
+                        <UIButton 
+                          variant="outline"
+                          onClick={handlePartilhar}
+                        >
+                          <Share2 className="w-4 h-4 mr-2" />
+                          Partilhar
+                        </UIButton>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            </>
           )}
         </AnimatePresence>
       </div>
 
       {/* Footer Seguro */}
-      <div className="max-w-md mx-auto mt-8 text-center">
+      <div className="max-w-md mx-auto mt-6 text-center">
         <p className="text-xs text-gray-400">
           🔒 Jogo certificado • SHA-256 verificado • Resultados justos
         </p>

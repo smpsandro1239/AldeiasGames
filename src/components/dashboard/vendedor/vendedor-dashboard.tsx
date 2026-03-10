@@ -45,6 +45,8 @@ import { UIButton, UICard, UIBadge } from '@/components/ui-components';
 // ============================================
 
 function handleLogout() {
+  console.log('Vendedor logout clicked');
+  alert('Vendedor logout clicked!');
   document.cookie.split(";").forEach((c) => { 
     document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
   });

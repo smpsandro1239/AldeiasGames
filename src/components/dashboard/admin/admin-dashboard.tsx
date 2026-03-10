@@ -57,6 +57,8 @@ import { UIButton, UICard, UIBadge } from '@/components/ui-components';
 // ============================================
 
 function handleLogout() {
+  console.log('Admin logout clicked');
+  alert('Admin logout clicked!');
   document.cookie.split(";").forEach((c) => { 
     document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
   });

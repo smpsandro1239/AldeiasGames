@@ -36,6 +36,7 @@ export function useAuthLogic() {
   }, [fetchProfile]);
 
   const logout = () => {
+    console.log('useAuthLogic logout called');
     localStorage.removeItem('token');
     setUser(null);
     router.push('/');

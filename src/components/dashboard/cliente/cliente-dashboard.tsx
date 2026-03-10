@@ -46,10 +46,13 @@ import { UIButton, UICard, UIBadge } from '@/components/ui-components';
 // ============================================
 
 function handleLogout() {
+  console.log('Logout clicked');
+  alert('Logout clicked!');
   document.cookie.split(";").forEach((c) => { 
     document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
   });
   localStorage.clear();
+  console.log('Redirecting to /');
   window.location.href = '/';
 }
 

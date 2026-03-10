@@ -16,7 +16,7 @@ import {
   Eye, 
   Edit,
   GripVertical,
-  Image,
+  Image as ImageIcon,
   Gift,
   Coins,
   AlertCircle,
@@ -24,7 +24,9 @@ import {
   ArrowRight,
   ArrowLeft,
   RefreshCw,
-  Settings
+  Settings,
+  Upload,
+  XCircle
 } from 'lucide-react';
 import { UIButton, UICard } from '@/components/ui-components';
 
@@ -38,6 +40,7 @@ interface PremioRaspadinha {
   valor: number;
   probabilidade: number; // 0-100
   simbolo: string;
+  imagem?: string;  // URL da imagem do símbolo
 }
 
 interface ConfigRaspadinha {
@@ -48,6 +51,9 @@ interface ConfigRaspadinha {
   dataExpiracao?: string;
   premios: PremioRaspadinha[];
   simbolos: string[];
+  imagens: string[];  // URLs das imagens para os símbolos
+  imagemFesta?: string;  // Imagem de fundo/tema da festa
+  usarImagens: boolean;  // Se deve usar imagens em vez de emojis
   cores: {
     primario: string;
     secundario: string;
@@ -91,13 +97,22 @@ function RaspadinhaPreview({ config }: { config: ConfigRaspadinha }) {
     <div className="bg-gradient-to-b from-gray-50 to-gray-100 rounded-2xl p-4">
       <p className="text-center text-sm text-gray-500 mb-3">Preview</p>
       
-      {/* Header */}
+      {/* Header com imagem da festa */}
       <div 
-        className="rounded-t-xl p-3 mb-3"
+        className="rounded-t-xl p-3 mb-3 relative overflow-hidden"
         style={{ backgroundColor: config.cores.primario }}
       >
-        <h3 className="text-white font-bold text-center">{config.titulo || 'Título da Raspadinha'}</h3>
-        <p className="text-white/80 text-xs text-center">{config.descricao || 'Descrição...'}</p>
+        {config.imagemFesta && (
+          <img 
+            src={config.imagemFesta} 
+            alt="Festa" 
+            className="absolute inset-0 w-full h-full object-cover opacity-30"
+          />
+        )}
+        <div className="relative z-10">
+          <h3 className="text-white font-bold text-center">{config.titulo || 'Título da Raspadinha'}</h3>
+          <p className="text-white/80 text-xs text-center">{config.descricao || 'Descrição...'}</p>
+        </div>
       </div>
 
       {/* Áreas de raspagem */}
@@ -105,23 +120,36 @@ function RaspadinhaPreview({ config }: { config: ConfigRaspadinha }) {
         className="grid grid-cols-3 gap-2 p-3 rounded-xl"
         style={{ backgroundColor: config.cores.secundario + '20' }}
       >
-        {Array(9).fill(null).map((_, i) => (
-          <button
-            key={i}
-            onClick={() => toggleArea(i)}
-            className={`aspect-square rounded-lg flex items-center justify-center text-2xl transition-all ${
-              areasReveladas.includes(i)
-                ? 'bg-white shadow-inner'
-                : 'bg-gradient-to-br from-gray-300 to-gray-400 hover:from-gray-200 hover:to-gray-300'
-            }`}
-          >
-            {areasReveladas.includes(i) ? (
-              <span>{config.simbolos[i % config.simbolos.length]}</span>
-            ) : (
-              <Sparkles className="w-5 h-5 text-gray-500" />
-            )}
-          </button>
-        ))}
+        {Array(9).fill(null).map((_, i) => {
+          const simbolo = config.simbolos[i % config.simbolos.length];
+          const imagem = config.imagens?.[i % config.imagens.length];
+          
+          return (
+            <button
+              key={i}
+              onClick={() => toggleArea(i)}
+              className={`aspect-square rounded-lg flex items-center justify-center text-2xl transition-all ${
+                areasReveladas.includes(i)
+                  ? 'bg-white shadow-inner'
+                  : 'bg-gradient-to-br from-gray-300 to-gray-400 hover:from-gray-200 hover:to-gray-300'
+              }`}
+            >
+              {areasReveladas.includes(i) ? (
+                config.usarImagens && imagem ? (
+                  <img 
+                    src={imagem} 
+                    alt={simbolo}
+                    className="max-w-[90%] max-h-[90%] object-contain"
+                  />
+                ) : (
+                  <span>{simbolo}</span>
+                )
+              ) : (
+                <Sparkles className="w-5 h-5 text-gray-500" />
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {/* Footer */}
@@ -379,12 +407,125 @@ function Passo3Personalizacao({
   config: ConfigRaspadinha; 
   onChange: (c: ConfigRaspadinha) => void;
 }) {
+  const [uploadingImage, setUploadingImage] = useState<string | null>(null);
+
+  // Handler para upload de imagem (simulado - em produção seria API)
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, tipo: 'festa' | 'simbolo', index?: number) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingImage(tipo + (index?.toString() || ''));
+
+    // Simular upload - criar URL local
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const imageUrl = event.target?.result as string;
+      
+      if (tipo === 'festa') {
+        onChange({ ...config, imagemFesta: imageUrl });
+      } else if (tipo !== null && index !== undefined) {
+        // Atualizar imagem do símbolo
+        const novasImagens = [...(config.imagens || [])];
+        // Garantir que o array tem tamanho suficiente
+        while (novasImagens.length <= index) {
+          novasImagens.push('');
+        }
+        novasImagens[index] = imageUrl;
+        onChange({ ...config, imagens: novasImagens });
+      }
+      setUploadingImage(null);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const toggleUsarImagens = () => {
+    onChange({ ...config, usarImagens: !config.usarImagens });
+  };
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
         <Settings className="w-5 h-5 text-blue-500" />
         Personalização
       </h3>
+
+      {/* Toggle usar imagens vs emojis */}
+      <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
+        <label className="flex items-center justify-between cursor-pointer">
+          <div className="flex items-center gap-3">
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${config.usarImagens ? 'bg-purple-500' : 'bg-gray-300'}`}>
+              {config.usarImagens ? <ImageIcon className="w-6 h-6 text-white" /> : <span className="text-2xl">⭐</span>}
+            </div>
+            <div>
+              <p className="font-bold text-gray-800">Usar Imagens</p>
+              <p className="text-xs text-gray-500">Substituir emojis por imagens personalizadas</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={toggleUsarImagens}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+              config.usarImagens ? 'bg-purple-500' : 'bg-gray-300'
+            }`}
+          >
+            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+              config.usarImagens ? 'translate-x-6' : 'translate-x-1'
+            }`} />
+          </button>
+        </label>
+      </div>
+
+      {/* Imagem da festa */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          🎉 Imagem da Festa
+        </label>
+        <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center hover:border-purple-400 transition-colors">
+          {config.imagemFesta ? (
+            <div className="relative inline-block">
+              <img 
+                src={config.imagemFesta} 
+                alt="Festa" 
+                className="w-32 h-32 object-cover rounded-xl mx-auto border-4 border-purple-300"
+              />
+              <button
+                onClick={() => onChange({ ...config, imagemFesta: undefined })}
+                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1"
+              >
+                <XCircle className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <label className="cursor-pointer">
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => handleImageUpload(e, 'festa')}
+                disabled={uploadingImage === 'festa'}
+              />
+              <div className="py-4">
+                {uploadingImage === 'festa' ? (
+                  <RefreshCw className="w-8 h-8 text-purple-500 mx-auto animate-spin" />
+                ) : (
+                  <>
+                    <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                    <p className="text-sm text-gray-500">
+                      Carregar imagem da festa
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      PNG, JPG até 5MB
+                    </p>
+                  </>
+                )}
+              </div>
+            </label>
+          )}
+        </div>
+        <p className="text-xs text-gray-500 mt-1">
+          Esta imagem aparece no header e nas instruções do jogo
+        </p>
+      </div>
 
       {/* Cores predefinidas */}
       <div>
@@ -411,35 +552,75 @@ function Passo3Personalizacao({
         </div>
       </div>
 
-      {/* Símbolos */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Símbolos do Jogo
-        </label>
-        <div className="flex flex-wrap gap-2">
-          {SIMBOLOS_PREDEFINIDOS.map((simbolo) => (
-            <button
-              key={simbolo}
-              onClick={() => {
-                if (!config.simbolos.includes(simbolo)) {
-                  onChange({ ...config, simbolos: [...config.simbolos, simbolo] });
-                }
-              }}
-              disabled={config.simbolos.includes(simbolo)}
-              className={`w-12 h-12 rounded-xl text-2xl transition-all ${
-                config.simbolos.includes(simbolo)
-                  ? 'bg-purple-100 text-purple-600'
-                  : 'bg-gray-100 hover:bg-gray-200'
-              }`}
-            >
-              {simbolo}
-            </button>
-          ))}
+      {/* Símbolos/Imagens */}
+      {config.usarImagens ? (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Imagens dos Símbolos
+          </label>
+          <p className="text-xs text-gray-500 mb-3">
+            Carregue uma imagem para cada símbolo (mínimo 3)
+          </p>
+          <div className="grid grid-cols-3 gap-3">
+            {config.simbolos.map((simbolo, index) => (
+              <div key={index} className="bg-gray-50 rounded-xl p-3 text-center">
+                <label className="cursor-pointer block">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => handleImageUpload(e, 'simbolo', index)}
+                    disabled={uploadingImage === `simbolo${index}`}
+                  />
+                  <div className="w-full aspect-square bg-white rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center overflow-hidden mb-2">
+                    {config.imagens && config.imagens[index] ? (
+                      <img 
+                        src={config.imagens[index]} 
+                        alt={`Símbolo ${index + 1}`}
+                        className="w-full h-full object-contain p-1"
+                      />
+                    ) : uploadingImage === `simbolo${index}` ? (
+                      <RefreshCw className="w-6 h-6 text-purple-500 animate-spin" />
+                    ) : (
+                      <ImageIcon className="w-8 h-8 text-gray-300" />
+                    )}
+                  </div>
+                  <span className="text-xs text-gray-500">{simbolo}</span>
+                </label>
+              </div>
+            ))}
+          </div>
         </div>
-        <p className="text-xs text-gray-500 mt-2">
-          Símbolos selecionados: {config.simbolos.join(' ')}
-        </p>
-      </div>
+      ) : (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Símbolos do Jogo
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {SIMBOLOS_PREDEFINIDOS.map((simbolo) => (
+              <button
+                key={simbolo}
+                onClick={() => {
+                  if (!config.simbolos.includes(simbolo)) {
+                    onChange({ ...config, simbolos: [...config.simbolos, simbolo] });
+                  }
+                }}
+                disabled={config.simbolos.includes(simbolo)}
+                className={`w-12 h-12 rounded-xl text-2xl transition-all ${
+                  config.simbolos.includes(simbolo)
+                    ? 'bg-purple-100 text-purple-600'
+                    : 'bg-gray-100 hover:bg-gray-200'
+                }`}
+              >
+                {simbolo}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-gray-500 mt-2">
+            Símbolos selecionados: {config.simbolos.join(' ')}
+          </p>
+        </div>
+      )}
     </div>
   );
 }
@@ -470,6 +651,9 @@ export function CriarRaspadinha({
     dataExpiracao: '',
     premios: [],
     simbolos: ['⭐', '💰', '🎁', '🍀', '🔥', '💎'],
+    imagens: [],
+    imagemFesta: undefined,
+    usarImagens: false,
     cores: CORES_PREDEFINIDAS[0]
   });
 

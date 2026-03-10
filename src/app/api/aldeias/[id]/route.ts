@@ -1,7 +1,9 @@
-// @ts-nocheck
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
+import { saveBase64Image } from '@/lib/storage';
+import { aldeiaSchema } from '@/lib/validations';
+import { ZodError } from 'zod';
 
 export async function GET(
   request: Request,
@@ -52,15 +54,11 @@ export async function PATCH(
     const user = await getUserFromRequest(request);
 
     if (!user) {
-      return NextResponse.json(
-        { error: 'Não autorizado' },
-        { status: 403 }
-      );
+      return NextResponse.json({ error: 'Não autorizado' }, { status: 403 });
     }
 
     const { id } = await params;
 
-    // Verificar permissões: super_admin pode editar qualquer uma, aldeia_admin só a sua
     if (user.role !== 'super_admin' && user.aldeiaId !== id) {
       return NextResponse.json(
         { error: 'Não tem permissão para editar esta organização' },
@@ -69,58 +67,55 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const {
-      nome,
-      descricao,
-      localizacao,
-      logoUrl,
-      logoBase64,
-      // Novos campos v3.0
-      morada,
-      codigoPostal,
-      localidade,
-      responsavel,
-      contactoResponsavel,
-      nomeEscola,
-      codigoEscola,
-      nivelEnsino,
-      autorizacaoCM,
-      numeroAlvara,
-      email,
-      telefone,
-      estado,
-    } = body;
+
+    // Validar dados
+    const validatedData = aldeiaSchema.partial().parse(body);
+
+    // Processar imagem
+    let finalLogoUrl = body.logoUrl;
+    if (body.logoBase64 && body.logoBase64.startsWith('data:image/')) {
+      finalLogoUrl = await saveBase64Image(body.logoBase64);
+    }
+
+    const updateData: any = {
+      nome: validatedData.nome,
+      descricao: validatedData.descricao,
+      localizacao: validatedData.localizacao,
+      logoUrl: finalLogoUrl,
+      logoBase64: null,
+      morada: validatedData.morada,
+      codigoPostal: validatedData.codigoPostal,
+      localidade: validatedData.localidade,
+      email: validatedData.email,
+      telefone: validatedData.telefone,
+      estado: validatedData.estado,
+      slug: validatedData.slug,
+      autorizacaoCM: validatedData.autorizacaoCM,
+      numeroAlvara: validatedData.numeroAlvara,
+    };
+
+    // Filtro para remover undefined
+    Object.keys(updateData).forEach(key =>
+      updateData[key] === undefined && delete updateData[key]
+    );
 
     const aldeia = await db.aldeia.update({
       where: { id },
-      data: {
-        nome,
-        descricao,
-        localizacao,
-        logoUrl,
-        logoBase64,
-        // Novos campos
-        morada,
-        codigoPostal,
-        localidade,
-        responsavel,
-        contactoResponsavel,
-        nomeEscola,
-        codigoEscola,
-        nivelEnsino,
-        autorizacaoCM,
-        numeroAlvara,
-        email,
-        telefone,
-        estado,
-      }
+      data: updateData
     });
 
     return NextResponse.json(aldeia);
-  } catch (error) {
-    console.error('Erro ao atualizar aldeia:', error);
+  } catch (error: any) {
+    if (error instanceof ZodError) {
+      return NextResponse.json({ error: error.issues[0].message }, { status: 400 });
+    }
+    console.error('Erro detalhado ao atualizar aldeia:', error);
     return NextResponse.json(
-      { error: 'Erro ao atualizar aldeia' },
+      {
+        error: 'Erro ao atualizar aldeia',
+        details: error.message,
+        prismaError: error.code
+      },
       { status: 500 }
     );
   }

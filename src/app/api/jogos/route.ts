@@ -1,82 +1,124 @@
-import { NextResponse } from 'next/server';
-import { getPaginacaoParams, respostaPaginada } from '@/lib/pagination';
-import { db } from '@/lib/db';
-import { getUserFromRequest } from '@/lib/auth';
-import { jogoSchema } from '@/lib/validations';
-import { ZodError } from 'zod';
+import { NextResponse } from 'next/server'
+import { prisma } from '@/lib/db'
+import { auth } from '@/lib/auth'
 
-export async function GET(request: Request) {
+export async function GET() {
   try {
-    const { searchParams } = new URL(request.url);
-    const eventoId = searchParams.get('eventoId');
-    const where = eventoId ? { eventoId } : {};
-    const paginacao = getPaginacaoParams(searchParams);
-    const total = await db.jogo.count({ where });
+    const user = await auth()
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Não autenticado' },
+        { status: 401 }
+      )
+    }
 
-    const jogos = await db.jogo.findMany({
+    // SuperAdmin pode ver todos os jogos
+    // OrgAdmin só vê jogos da sua org
+    // Vendedor só vê jogos da sua org
+    const where = user.role === 'SUPERADMIN' 
+      ? {}
+      : { organizacaoId: user.orgId }
+
+    const jogos = await prisma.jogo.findMany({
       where,
       include: {
-        evento: {
-          include: {
-            aldeia: {
-              select: {
-                id: true, nome: true, tipoOrganizacao: true,
-                autorizacaoCM: true,
-                numeroAlvara: true
-              }
-            }
+        organizacao: {
+          select: {
+            name: true
           }
-        },
-        premio: true,
-        _count: { select: { participacoes: true } }
-      },
-      orderBy: { createdAt: 'desc' },
-      skip: paginacao.skip,
-      take: paginacao.limite,
-    });
-    const jogosProcessados = jogos.map(jogo => ({
-      ...jogo,
-      premiosRaspadinha: jogo.premiosRaspadinha ? JSON.parse(jogo.premiosRaspadinha) : null,
-    }));
+        }
+      }
+    })
 
-    return respostaPaginada(jogosProcessados, total, paginacao);
+    return NextResponse.json({
+      success: true,
+      data: jogos
+    })
   } catch (error) {
-    console.error("Erro ao buscar jogos:", error);
-    return NextResponse.json({ error: "Erro ao buscar jogos" }, { status: 500 });
+    return NextResponse.json(
+      { 
+        error: error instanceof Error ? error.message : 'Erro interno',
+        timestamp: new Date().toISOString() 
+      },
+      { status: 500 }
+    );
   }
 }
 
-export async function POST(request: Request) {
+export async function POST() {
   try {
-    const user = await getUserFromRequest(request);
-    if (!user || !['super_admin', 'aldeia_admin'].includes(user.role)) {
-      return NextResponse.json({ error: 'Não autorizado' }, { status: 403 });
+    const user = await auth()
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Não autenticado' },
+        { status: 401 }
+      )
     }
 
-    const body = await request.json();
-    const validatedData = jogoSchema.parse(body);
+    // Só OrgAdmin e SuperAdmin podem criar jogos
+    if (!['ORG_ADMIN', 'SUPERADMIN'].includes(user.role)) {
+      return NextResponse.json(
+        { error: 'Não autorizado' },
+        { status: 403 }
+      )
+    }
 
-    const jogo = await db.jogo.create({
-      data: {
-        titulo: (body as any).titulo || 'Novo Jogo',
-        tipo: validatedData.tipo,
-        estado: (body as any).estado || 'aberto',
-        eventoId: validatedData.eventoId,
-        precoParticipacao: validatedData.precoParticipacao,
-        config: typeof validatedData.config === 'string' ? validatedData.config : JSON.stringify(validatedData.config),
-        premioId: validatedData.premioId,
-        stockInicial: validatedData.stockInicial,
-        premiosRaspadinha: validatedData.premiosRaspadinha ? JSON.stringify(validatedData.premiosRaspadinha) : null,
-        limitePorUsuario: validatedData.limitePorUsuario,
+    const body = await request.json()
+    
+    // Validar input
+    const requiredFields = ['nome', 'tipo', 'configuracao']
+    for (const field of requiredFields) {
+      if (!body[field]) {
+        return NextResponse.json(
+          { error: `Campo '${field}' é obrigatório` },
+          { status: 400 }
+        )
       }
-    });
-
-    return NextResponse.json(jogo, { status: 201 });
-  } catch (error) {
-    if (error instanceof ZodError) {
-      return NextResponse.json({ error: error.issues[0].message }, { status: 400 });
     }
-    console.error('Erro ao criar jogo:', error);
-    return NextResponse.json({ error: 'Erro ao criar jogo' }, { status: 500 });
+
+    // Criar jogo
+    const jogo = await prisma.jogo.create({
+      data: {
+        nome: body.nome,
+        tipo: body.tipo,
+        descricao: body.descricao,
+        configuracao: body.configuracao,
+        organizacaoId: user.orgId
+      },
+      include: {
+        organizacao: {
+          select: {
+            name: true
+          }
+        }
+      }
+    })
+
+    return NextResponse.json({
+      success: true,
+      data: jogo
+    }, { status: 201 })
+  } catch (error) {
+    return NextResponse.json(
+      { 
+        error: error instanceof Error ? error.message : 'Erro interno',
+        timestamp: new Date().toISOString() 
+      },
+      { status: 500 }
+    );
   }
+}
+
+export async function PUT() {
+  return NextResponse.json(
+    { error: 'Método não permitido' },
+    { status: 405 }
+  );
+}
+
+export async function DELETE() {
+  return NextResponse.json(
+    { error: 'Método não permitido' },
+    { status: 405 }
+  );
 }

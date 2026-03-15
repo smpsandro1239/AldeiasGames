@@ -26,3 +26,5 @@ npm-debug.log*
 # Token files
 *.token
 credentials/
+node_modules/
+.next/

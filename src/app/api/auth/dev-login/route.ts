@@ -1,87 +1,120 @@
-import { NextResponse } from 'next/server';
-import { createToken } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
+import bcrypt from 'bcryptjs'
 
+// Quick login - creates test users if they don't exist and logs them in
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { email, role } = body;
-
-    if (!email || !role) {
-      return NextResponse.json(
-        { error: 'Email e role são obrigatórios' },
-        { status: 400 }
-      );
+    const { role } = await request.json()
+    
+    // Password for all test users
+    const passwordHash = await bcrypt.hash('123456', 10)
+    
+    let email = ''
+    let userRole = 'PLAYER'
+    let userName = ''
+    
+    switch (role) {
+      case 'SUPERADMIN':
+        email = 'admin@aldeias.pt'
+        userRole = 'SUPERADMIN'
+        userName = 'Super Administrador'
+        break
+      case 'ORG_ADMIN':
+        email = 'admin@aldeia.pt'
+        userRole = 'ORG_ADMIN'
+        userName = 'Admin Organização'
+        break
+      case 'VENDEDOR':
+        email = 'vendedor@aldeia.pt'
+        userRole = 'VENDEDOR'
+        userName = 'Vendedor Teste'
+        break
+      case 'PLAYER':
+      default:
+        email = 'jogador@aldeia.pt'
+        userRole = 'PLAYER'
+        userName = 'Jogador Teste'
+        break
     }
-
-    // Verificar se o utilizador já existe
-    let user = await db.user.findUnique({
-      where: { email },
-      include: { aldeia: true },
-    });
-
-    // Se não existir, criar utilizador de desenvolvimento
+    
+    // Check if user exists
+    let user = await prisma.user.findUnique({
+      where: { email }
+    })
+    
     if (!user) {
-      user = await db.user.create({
+      // Create user with organization if needed
+      let org = null
+      if (userRole === 'ORG_ADMIN' || userRole === 'VENDEDOR' || userRole === 'PLAYER') {
+        org = await prisma.organization.findFirst()
+        if (!org) {
+          org = await prisma.organization.create({
+            data: {
+              nome: 'Aldeia de Teste',
+              slug: 'aldeia-teste',
+              email: 'teste@aldeia.pt',
+              telefone: '+351912345678',
+            }
+          })
+        }
+      }
+      
+      // Create the user
+      user = await prisma.user.create({
         data: {
           email,
-          nome: getDevNameByRole(role),
-          passwordHash: 'dev-login-hash', // Não é usado para login real
-          role,
-        },
-        include: { aldeia: true },
-      });
+          nome: userName,
+          password: passwordHash,
+          role: userRole as any,
+          orgId: org?.id || null,
+        }
+      })
+    } else {
+      // Update password and role
+      user = await prisma.user.update({
+        where: { email },
+        data: {
+          password: passwordHash,
+          role: userRole as any,
+        }
+      })
     }
-
-    // Atualizar último login
-    try {
-      await db.user.update({
-        where: { id: user!.id },
-        data: { ultimoLogin: new Date() }
-      });
-    } catch (e) {
-      // Ignorar erro
-    }
-
-    const token = await createToken({
-      id: user!.id,
-      email: user!.email,
-      nome: user!.nome,
-      role: user!.role,
-      aldeiaId: user!.aldeiaId || undefined,
-    });
-
-    return NextResponse.json({
+    
+    // Create a simple token (for demo purposes)
+    const token = Buffer.from(JSON.stringify({
+      id: user.id,
+      email: user.email,
+      nome: user.nome,
+      role: user.role,
+    })).toString('base64')
+    
+    const response = NextResponse.json({
+      success: true,
       user: {
-        id: user!.id,
-        nome: user!.nome,
-        email: user!.email,
-        role: user!.role,
-        aldeiaId: user!.aldeiaId,
-        aldeia: user!.aldeia,
+        id: user.id,
+        email: user.email,
+        nome: user.nome,
+        role: user.role,
       },
-      token,
-    });
+      token
+    })
+    
+    // Set cookie
+    response.cookies.set('auth-token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 7 // 1 week
+    })
+    
+    return response
+    
   } catch (error) {
-    console.error('Erro no login de desenvolvimento:', error);
+    console.error('Erro no login de desenvolvimento:', error)
     return NextResponse.json(
-      { error: 'Erro interno do servidor' },
+      { error: 'Erro ao fazer login' },
       { status: 500 }
-    );
-  }
-}
-
-function getDevNameByRole(role: string): string {
-  switch (role) {
-    case 'super_admin':
-      return 'Dev Super Admin';
-    case 'aldeia_admin':
-      return 'Dev Admin Aldeia';
-    case 'vendedor':
-      return 'Dev Vendedor';
-    case 'user':
-      return 'Dev Jogador';
-    default:
-      return 'Dev Utilizador';
+    )
   }
 }

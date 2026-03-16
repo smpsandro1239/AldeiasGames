@@ -28,3 +28,6 @@ npm-debug.log*
 credentials/
 node_modules/
 .next/
+node_modules/
+.next/
+.vercel/

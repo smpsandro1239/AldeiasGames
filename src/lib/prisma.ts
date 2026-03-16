@@ -2,7 +2,6 @@ import { PrismaClient } from '@prisma/client'
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
-  db: PrismaClient | undefined
 }
 
 export const prisma =
@@ -11,19 +10,9 @@ export const prisma =
     log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
   })
 
-// Alias for backward compatibility
+// Alias for backward compatibility  
 export const db = prisma
 
 if (process.env.NODE_ENV !== 'production') {
   globalForPrisma.prisma = prisma
-  globalForPrisma.db = prisma
-}
-
-export async function alterarParticipacao(id: string, data: any) {
-  return await prisma.participacao.update({
-    where: { id },
-    data: {
-      dadosParticipacao: JSON.stringify(data),
-    },
-  });
 }

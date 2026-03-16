@@ -60,6 +60,21 @@ enum StatusAlteracao {
   REJEITADO
 }
 
+// Legacy Enums (for old seed)
+enum Role {
+  super_admin
+  aldeia_admin
+  vendedor
+  user
+}
+
+enum Estado {
+  rascunho
+  ativo
+  pausado
+  finalized
+}
+
 // Models
 model User {
   id            String   @id @default(uuid())
@@ -67,21 +82,33 @@ model User {
   nome          String
   telefone      String?
   password      String
+  passwordHash  String?   // Legacy field
   role          UserRole
   status        UserStatus @default(ATIVO)
   orgId         String?
-  org           Organization? @relation(fields: [orgId], references: [id])
+  org           Organization? @relation("UserOrg", fields: [orgId], references: [id])
   
+  // Legacy fields
+  aldeiaId      String?
+  aldeia        Aldeia? @relation(fields: [aldeiaId], references: [id])
+
   // Player fields
-  saldo         Decimal  @default(0) @db.Decimal(10,2)
-  comissaoPct   Decimal  @default(5) @db.Decimal(5,2)
+  saldo         Float  @default(0)
+  comissaoPct   Float  @default(5)
   
   // Relations
   jogadas       Jogada[] @relation("PlayerJogadas")
   vendas        Jogada[] @relation("VendedorJogadas")
   recargas      RecargaSaldo[] @relation("PlayerRecargas")
+  recargasFeitas RecargaSaldo[] @relation("VendedorRecargas")
   solicitacoes  HistoricoAlteracao[] @relation("Solicitante")
   aprovacoes    HistoricoAlteracao[] @relation("Aprovador")
+  anulacoes     Anulacao[] @relation("AnuladoPor")
+  anulacoesConfirmadas Anulacao[] @relation("ConfirmadoPor")
+  
+  // Legacy relations
+  participacoes Participacao[]
+  vendasLegacy Participacao[] @relation("VendedorParticipacoes")
   
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -99,17 +126,44 @@ model Organization {
   limiteStorage Int     @default(1000) // MB
   
   // Relations
-  users         User[]   @relation("OrgUsers")
+  users         User[]   @relation("UserOrg")
   jogos         Jogo[]   @relation("OrgJogos")
   
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }
 
+// Legacy: Aldeia (Organization)
+model Aldeia {
+  id          String   @id @default(uuid())
+  nome        String
+  descricao   String?
+  localizacao String?
+  
+  // Relations
+  admins      User[] 
+  eventos     Evento[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Plano {
+  id              String   @id @default(uuid())
+  nome            String
+  precoMensal     Float
+  maxEventos      Int
+  maxJogos        Int
+  maxParticipacoes Int
+  descricao       String?
+  
+  createdAt       DateTime @default(now())
+}
+
 model Jogo {
   id            String   @id @default(uuid())
   orgId         String
-  org           Organization @relation(fields: [orgId], references: [id])
+  org           Organization @relation("OrgJogos", fields: [orgId], references: [id])
   tipo          TipoJogo
   titulo        String
   descricao     String?
@@ -122,8 +176,15 @@ model Jogo {
   apiEuromilhoes Boolean @default(false)
   avisos        Json?
   
+  // Legacy relations
+  eventoId      String?
+  evento        Evento? @relation(fields: [eventoId], references: [id])
+  precoParticipacao Float?
+  tipoLegacy    String?
+  
   // Relations
   jogadas       Jogada[] @relation("JogoJogadas")
+  participacoes Participacao[]
   
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -139,7 +200,7 @@ model Jogada {
   jogo          Jogo @relation("JogoJogadas", fields: [jogoId], references: [id])
   tipoJogo      TipoJogo
   detalhes      Json
-  valor         Decimal @db.Decimal(10,2)
+  valor         Float
   metodoPagamento PaymentMethod
   statusPagamento PaymentStatus @default(CONFIRMADO)
   statusJogada  String // ATIVA, ANULADA, CONCLUIDA, PENDENTE_ALTERACAO
@@ -158,12 +219,12 @@ model Jogada {
 model HistoricoAlteracao {
   id            String   @id @default(uuid())
   jogadaId      String
-  jogada        Jogada @relation(fields: [jogadaId], references: [id])
+  jogada        Jogada @relation("JogadaHistorico", fields: [jogadaId], references: [id])
   tipoAlteracao TipoAlteracao
   dadosOriginais Json?
-  valorOriginal Decimal @db.Decimal(10,2)
+  valorOriginal Float
   dadosNovos    Json?
-  valorNovo     Decimal?
+  valorNovo     Float?
   motivo        String
   solicitadoPor String
   solicitante   User @relation("Solicitante", fields: [solicitadoPor], references: [id])
@@ -179,9 +240,9 @@ model HistoricoAlteracao {
 
 model Anulacao {
   id            String   @id @default(uuid())
-  jogadaId      String
+  jogadaId      String  @unique
   jogada        Jogada @relation(fields: [jogadaId], references: [id])
-  valor         Decimal @db.Decimal(10,2)
+  valor         Float
   motivo        String
   anuladoPor    String
   anuladoPorUser User @relation("AnuladoPor", fields: [anuladoPor], references: [id])
@@ -199,11 +260,46 @@ model RecargaSaldo {
   player        User @relation("PlayerRecargas", fields: [playerId], references: [id])
   vendedorId    String
   vendedor      User @relation("VendedorRecargas", fields: [vendedorId], references: [id])
-  valor         Decimal @db.Decimal(10,2)
+  valor         Float
   metodo        PaymentMethod
   comprovativo  String?
   status        PaymentStatus @default(CONFIRMADO)
   processadoEm  DateTime @default(now())
   
   createdAt     DateTime @default(now())
+}
+
+// Legacy: Evento
+model Evento {
+  id          String   @id @default(uuid())
+  aldeiaId    String
+  aldeia      Aldeia @relation(fields: [aldeiaId], references: [id])
+  nome        String
+  descricao   String?
+  dataInicio  DateTime
+  dataFim     DateTime?
+  estado      String @default("ativo")
+  
+  jogos       Jogo[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Legacy: Participacao
+model Participacao {
+  id          String   @id @default(uuid())
+  jogoId      String
+  jogo        Jogo @relation(fields: [jogoId], references: [id])
+  userId      String
+  user        User @relation(fields: [userId], references: [id])
+  vendedorId  String?
+  vendedor    User? @relation("VendedorParticipacoes", fields: [vendedorId], references: [id])
+  valorPago   Float
+  dadosParticipacao Json?
+  metodoPagamento String?
+  estado      String @default("ativa")
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

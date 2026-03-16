@@ -17,7 +17,56 @@ export interface UserPayload {
   nome: string;
   role: string;
   aldeiaId?: string;
+  orgId?: string;
 }
+
+// Export auth function for middleware
+import { cookies } from 'next/headers';
+
+export async function auth() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get('auth-token');
+  
+  if (!token) {
+    return null;
+  }
+  
+  try {
+    // Decode the base64 token
+    const decoded = JSON.parse(Buffer.from(token.value, 'base64').toString('utf-8'));
+    return {
+      user: {
+        id: decoded.id,
+        email: decoded.email,
+        nome: decoded.nome,
+        role: decoded.role,
+      }
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
+// Auth options for NextAuth
+export const authOptions = {
+  providers: [],
+  callbacks: {
+    async session({ session, token }: any) {
+      if (token && session.user) {
+        session.user.id = token.sub;
+        session.user.role = token.role;
+      }
+      return session;
+    },
+    async jwt({ token, user }: any) {
+      if (user) {
+        token.role = user.role;
+      }
+      return token;
+    }
+  },
+  secret: JWT_SECRET,
+};
 
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, 10);

@@ -6,4 +6,4 @@
 *.mp4 filter=lfs
 *.mov filter=lfs
 *.avi filter=lfs
-*.mp3 filter=lfs
+*.mp3 filter=lfs*.node filter=lfs

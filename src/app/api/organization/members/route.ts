@@ -1,22 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { getUserFromRequest } from '@/lib/auth';
 import { SUPERADMIN, ORG_ADMIN } from '@/constants/roles';
+
+// Helper de autentização/autorização (usa o sistema JWT próprio do projeto,
+// compatível com next-auth v5 — getServerSession não existe nesta versão).
+async function requireAdmin(request: NextRequest): Promise<{ user: any } | NextResponse> {
+  const user = await getUserFromRequest(request);
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  if (user.role !== SUPERADMIN && user.role !== ORG_ADMIN) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+  return { user };
+}
+
+function isErrorResponse(v: any): v is NextResponse {
+  return v instanceof NextResponse;
+}
 
 // GET /api/organization/members - List members
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Check authorization: SUPERADMIN or ORG_ADMIN
-    const userRole = session.user.role;
-    if (userRole !== SUPERADMIN && userRole !== ORG_ADMIN) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
+    const authResult = await requireAdmin(request);
+    if (isErrorResponse(authResult)) return authResult;
 
     const members = await prisma.organizationMember.findMany({
       include: {
@@ -35,15 +43,8 @@ export async function GET(request: NextRequest) {
 // POST /api/organization/members - Create member
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const userRole = session.user.role;
-    if (userRole !== SUPERADMIN && userRole !== ORG_ADMIN) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
+    const authResult = await requireAdmin(request);
+    if (isErrorResponse(authResult)) return authResult;
 
     const { email, name, role, organizationId } = await request.json();
 
@@ -112,18 +113,11 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// PUT /api/organization/members/[id] - Update member role
+// PUT /api/organization/members - Update member role (?id=...)
 export async function PUT(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const userRole = session.user.role;
-    if (userRole !== SUPERADMIN && userRole !== ORG_ADMIN) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
+    const authResult = await requireAdmin(request);
+    if (isErrorResponse(authResult)) return authResult;
 
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
@@ -156,18 +150,11 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-// DELETE /api/organization/members/[id] - Remove member
+// DELETE /api/organization/members - Remove member (?id=...)
 export async function DELETE(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const userRole = session.user.role;
-    if (userRole !== SUPERADMIN && userRole !== ORG_ADMIN) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
+    const authResult = await requireAdmin(request);
+    if (isErrorResponse(authResult)) return authResult;
 
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
@@ -182,96 +169,6 @@ export async function DELETE(request: NextRequest) {
     return new NextResponse(null, { status: 204 });
   } catch (error) {
     console.error('Error deleting member:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-}
-
-// POST /api/organization/members/invite - Send email invitation
-export async function POST_INVITE(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const userRole = session.user.role;
-    if (userRole !== SUPERADMIN && userRole !== ORG_ADMIN) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-
-    const { email, role, organizationId } = await request.json();
-
-    if (!email || !role || !organizationId) {
-      return NextResponse.json(
-        { error: 'Missing required fields: email, role, organizationId' },
-        { status: 400 }
-      );
-    }
-
-    if (!['ADMIN', 'MEMBER'].includes(role)) {
-      return NextResponse.json(
-        { error: 'Role must be ADMIN or MEMBER' },
-        { status: 400 }
-      );
-    }
-
-    // Check if user already exists
-    let user = await prisma.user.findUnique({ where: { email } });
-    let isNewUser = false;
-
-    if (!user) {
-      isNewUser = true;
-      // Create invited user (with temporary password)
-      user = await prisma.user.create({
-        data: {
-          email,
-          name: email.split('@')[0], // Use email prefix as default name
-          password: 'temp_' + Math.random().toString(36).substring(2, 12),
-          emailVerified: null, // Not verified until they accept invitation
-        },
-      });
-    }
-
-    // Check if already a member
-    const existingMember = await prisma.organizationMember.findFirst({
-      where: {
-        userId: user.id,
-        organizationId,
-      },
-    });
-
-    if (existingMember) {
-      return NextResponse.json(
-        { error: 'User is already a member of this organization' },
-        { status: 400 }
-      );
-    }
-
-    // Create organization member
-    const member = await prisma.organizationMember.create({
-      data: {
-        userId: user.id,
-        organizationId,
-        role,
-      },
-      include: {
-        user: true,
-        organization: true,
-      },
-    });
-
-    // In a real app, you would send an email here
-    // For now, we just return success
-    return NextResponse.json(
-      {
-        message: `Invitation sent to ${email}`,
-        member,
-        isNewUser,
-      },
-      { status: 201 }
-    );
-  } catch (error) {
-    console.error('Error sending invitation:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

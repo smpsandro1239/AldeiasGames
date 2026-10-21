@@ -37,3 +37,4 @@ cookies.txt
 *.db
 *.db-journal
 prisma/prisma/
+tsconfig.tsbuildinfo

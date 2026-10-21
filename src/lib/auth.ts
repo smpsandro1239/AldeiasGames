@@ -4,9 +4,13 @@ import { SignJWT, jwtVerify } from 'jose';
 
 // Chave secreta para JWT
 // 🔴 Segurança: em produção o JWT_SECRET é OBRIGATÓRIO — a aplicação falha no arranque se estiver ausente.
+// Exceção: durante `next build` (NEXT_PHASE === 'phase-production-build') o Next.js importa todos os
+// módulos para recolher dados das páginas; o segredo NÃO é necessário nessa fase, apenas em runtime.
+// Nota: o Vercel define NODE_ENV=production também na build, por isso verificamos NEXT_PHASE primeiro.
+const IS_BUILD_PHASE = process.env.NEXT_PHASE === 'phase-production-build';
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-placeholder-NUNCA-usar-em-producao-12345';
 
-if (!process.env.JWT_SECRET) {
+if (!process.env.JWT_SECRET && !IS_BUILD_PHASE) {
   if (process.env.NODE_ENV === 'production') {
     throw new Error(
       'CRITICAL: A variável de ambiente JWT_SECRET está em falta em produção. Defina-a antes do arranque.'

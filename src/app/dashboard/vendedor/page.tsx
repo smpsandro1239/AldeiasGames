@@ -1,10 +1,10 @@
 'use client'
 
-import { useSession } from 'next-auth/react'
+import { useClientSession } from '@/lib/session'
 import { useEffect, useState } from 'react'
 
 export default function VendedorDashboard() {
-  const { data: session, status } = useSession()
+  const { data: session, status } = useClientSession()
   const [vendasRecentes, setVendasRecentes] = useState<any[]>([])
 
   useEffect(() => {

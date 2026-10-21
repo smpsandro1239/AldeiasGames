@@ -1,11 +1,11 @@
 'use client'
 
-import { useSession } from 'next-auth/react'
+import { useClientSession, logout } from '@/lib/session'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
 export default function OrgAdminDashboard() {
-  const { data: session, status } = useSession()
+  const { data: session, status } = useClientSession()
   const router = useRouter()
   const [jogos, setJogos] = useState<any[]>([])
 
@@ -49,14 +49,14 @@ export default function OrgAdminDashboard() {
         <header className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">
-              Dashboard - {session.user.org?.name || 'Minha Organização'}
+              Dashboard - {session.user.aldeiaId ? `Aldeia ${session.user.aldeiaId}` : 'Minha Organização'}
             </h1>
             <p className="text-gray-600">
               Admin: {session.user.name}
             </p>
           </div>
           <button
-            onClick={() => signOut({ callbackUrl: '/login' })}
+            onClick={() => logout('/login')}
             className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
           >
             Sair

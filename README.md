@@ -43,7 +43,7 @@ src/
 ├── hooks/        # Lógica de negócio e estado (Zustand, React Query)
 ├── lib/          # Utilitários, Motores (Auth, DB, Stripe, Storage)
 ├── types/        # Tipagem centralizada e rigorosa
-└── middleware.ts # Camada de segurança global (Rate Limit/Auth)
+└── proxy.ts # Camada de segurança global (Rate Limit/Auth)
 ```
 
 ## ⚙️ Instalação e Execução

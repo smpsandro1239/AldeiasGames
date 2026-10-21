@@ -203,6 +203,7 @@ model Jogo {
   jogadas       Jogada[] @relation("JogoJogadas")
   participacoes Participacao[]
   premios       Premio[] @relation("JogoPremios")
+  premioPrincipal Premio?  @relation("PremioJogo")
   sorteio       Sorteio? @relation("JogoSorteio")
   
   createdAt     DateTime @default(now())

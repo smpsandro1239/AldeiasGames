@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { ThemeProvider } from "next-themes";
+import PWARegister from "@/components/PWARegister";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -21,6 +22,12 @@ export const metadata: Metadata = {
   authors: [{ name: "Sandro Pereira" }],
   icons: {
     icon: "/favicon.svg",
+  },
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Aldeias Games",
   },
   openGraph: {
     title: "Aldeias Games",
@@ -47,6 +54,7 @@ export default function RootLayout({
         >
           {children}
           <Toaster />
+          <PWARegister />
         </ThemeProvider>
       </body>
     </html>

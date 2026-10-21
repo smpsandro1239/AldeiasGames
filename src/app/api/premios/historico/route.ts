@@ -49,12 +49,13 @@ export async function GET(request: Request) {
       }
     });
 
-    // Buscar participações ganhas
+    // Buscar participações ganhas (resultado da raspadinha guardado em resultadoRaspe)
+    // O campo `ganhou`/`premio` não existe no schema; o vencedor é determinado pelo
+    // resultadoRaspe revelado (ver /api/participacoes/[id]/revelar).
     const participacoesGanhas = await db.participacao.findMany({
       where: {
         userId: user.id,
-        ganhou: true,
-        premio: { not: null }
+        estado: 'pago'
       },
       include: {
         jogo: {
@@ -70,9 +71,21 @@ export async function GET(request: Request) {
       }
     });
 
+    // Filtrar apenas as que têm prémio atribuído no resultado da raspadinha
+    const participacoesComPremio = participacoesGanhas.filter((participacao: any) => {
+      try {
+        const r = typeof participacao.resultadoRaspe === 'string'
+          ? JSON.parse(participacao.resultadoRaspe)
+          : participacao.resultadoRaspe;
+        return r?.premio && r.premio.valor > 0;
+      } catch {
+        return false;
+      }
+    });
+
     return NextResponse.json({
       premios,
-      participacoes: participacoesGanhas,
+      participacoes: participacoesComPremio,
       totalPremios: premios.length,
       totalResgatados: premios.filter(p => p.dataResgate).length
     });

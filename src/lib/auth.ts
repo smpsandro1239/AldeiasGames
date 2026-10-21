@@ -3,10 +3,19 @@ import bcrypt from 'bcryptjs';
 import { SignJWT, jwtVerify } from 'jose';
 
 // Chave secreta para JWT
+// 🔴 Segurança: em produção o JWT_SECRET é OBRIGATÓRIO — a aplicação falha no arranque se estiver ausente.
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-placeholder-NUNCA-usar-em-producao-12345';
 
-if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') {
-  console.error('CRITICAL: JWT_SECRET environment variable is missing in production!');
+if (!process.env.JWT_SECRET) {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'CRITICAL: A variável de ambiente JWT_SECRET está em falta em produção. Defina-a antes do arranque.'
+    );
+  } else {
+    console.warn(
+      'AVISO: JWT_SECRET não definido — a usar segredo de desenvolvimento. NUNCA use este modo em produção.'
+    );
+  }
 }
 
 const SECRET = new TextEncoder().encode(JWT_SECRET);

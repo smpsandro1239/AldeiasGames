@@ -1,11 +1,11 @@
 'use client'
 
-import { useSession, signOut } from 'next-auth/react'
+import { useClientSession } from '@/lib/session'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 
 export default function DashboardPage() {
-  const { data: session, status } = useSession()
+  const { data: session, status } = useClientSession()
   const router = useRouter()
 
   useEffect(() => {

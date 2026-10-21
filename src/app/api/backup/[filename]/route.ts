@@ -7,9 +7,9 @@ const DB_PATH = path.join(process.cwd(), 'db', 'custom.db');
 const BACKUP_DIR = path.join(process.cwd(), 'backups');
 
 interface RouteParams {
-    params: {
+    params: Promise<{
         filename: string;
-    };
+    }>;
 }
 
 // DELETE - Apagar um backup
@@ -20,7 +20,7 @@ export async function DELETE(request: Request, { params }: RouteParams) {
             return NextResponse.json({ error: 'Não autorizado' }, { status: 403 });
         }
 
-        const { filename } = params;
+        const { filename } = await params;
         const filePath = path.join(BACKUP_DIR, filename);
 
         if (!fs.existsSync(filePath)) {
@@ -44,7 +44,7 @@ export async function POST(request: Request, { params }: RouteParams) {
             return NextResponse.json({ error: 'Não autorizado' }, { status: 403 });
         }
 
-        const { filename } = params;
+        const { filename } = await params;
         const backupPath = path.join(BACKUP_DIR, filename);
 
         if (!fs.existsSync(backupPath)) {
@@ -72,7 +72,7 @@ export async function GET(request: Request, { params }: RouteParams) {
             return new Response('Não autorizado', { status: 403 });
         }
 
-        const { filename } = params;
+        const { filename } = await params;
         const filePath = path.join(BACKUP_DIR, filename);
 
         if (!fs.existsSync(filePath)) {

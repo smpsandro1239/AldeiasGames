@@ -8,20 +8,18 @@ on:
 
 jobs:
   build:
-    # ubuntu-24.04 fixo: evita a migração automática para Ubuntu 26 (oct/2026)
-    # que quebraria runners de forma inesperada.
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v3
         with:
           node-version: '22'
           cache: 'npm'
@@ -42,8 +40,7 @@ jobs:
         continue-on-error: false
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: nextjs-build
           path: .next/
-          if-no-files-found: warn

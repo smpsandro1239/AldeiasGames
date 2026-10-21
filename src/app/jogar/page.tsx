@@ -1,11 +1,11 @@
 'use client'
 
-import { useSession } from 'next-auth/react'
+import { useClientSession } from '@/lib/session'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
 export default function JogadorPage() {
-  const { data: session, status } = useSession()
+  const { data: session, status } = useClientSession()
   const router = useRouter()
   const [jogos, setJogos] = useState([])
   const [saldo, setSaldo] = useState(0)

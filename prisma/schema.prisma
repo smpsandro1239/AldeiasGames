@@ -1,6 +1,7 @@
 // prisma/schema.prisma
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
@@ -202,6 +203,7 @@ model Jogo {
   jogadas       Jogada[] @relation("JogoJogadas")
   participacoes Participacao[]
   premios       Premio[] @relation("JogoPremios")
+  premioPrincipal Premio?  @relation("PremioJogo")
   sorteio       Sorteio? @relation("JogoSorteio")
   
   createdAt     DateTime @default(now())

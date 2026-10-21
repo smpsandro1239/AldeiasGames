@@ -1,6 +1,6 @@
 {
   "name": "nextjs_tailwind_shadcn_ts",
-  "version": "0.2.0",
+  "version": "3.11.0",
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000 --webpack 2>&1 | tee dev.log",
@@ -119,5 +119,8 @@
     "typescript": "^5.9.3"
   },
   "author": "Sandro Pereira",
-  "license": "MIT"
+  "license": "MIT",
+  "prisma": {
+    "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
+  }
 }

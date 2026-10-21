@@ -31,3 +31,9 @@ node_modules/
 node_modules/
 .next/
 .vercel/
+
+# Higiene do repositório
+cookies.txt
+*.db
+*.db-journal
+prisma/prisma/

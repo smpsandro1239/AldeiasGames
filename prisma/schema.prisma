@@ -105,6 +105,8 @@ model User {
   aprovacoes    HistoricoAlteracao[] @relation("Aprovador")
   anulacoes     Anulacao[] @relation("AnuladoPor")
   anulacoesConfirmadas Anulacao[] @relation("ConfirmadoPor")
+  sorteiosExecutados Sorteio[] @relation("ExecutorSorteios")
+  carrinhoItens CarrinhoItem[]
   
   // Legacy relations
   participacoes Participacao[]
@@ -124,10 +126,17 @@ model Organization {
   modoTeste     Boolean @default(true)
   limiteUsers   Int     @default(500)
   limiteStorage Int     @default(1000) // MB
+
+  // Configurações globais / feature flags (Settings do Admin)
+  comissaoPadraoPct Float @default(5)
+  limiteRecargaMax  Float @default(10000)
+  features          Json?
   
   // Relations
   users         User[]   @relation("UserOrg")
   jogos         Jogo[]   @relation("OrgJogos")
+  premios       Premio[] @relation("OrgPremios")
+  sorteios      Sorteio[] @relation("OrgSorteios")
   
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -164,6 +173,13 @@ model Jogo {
   id            String   @id @default(uuid())
   orgId         String
   org           Organization @relation("OrgJogos", fields: [orgId], references: [id])
+
+  // Campos de raspadinha/tombola (/api/participacoes, /api/jogos/raspadinha)
+  estado            String?
+  premiosRaspadinha Json?
+  stockInicial      Int?
+  stockRestante     Int?
+  limitePorUsuario  Int?
   tipo          TipoJogo
   titulo        String
   descricao     String?
@@ -185,9 +201,81 @@ model Jogo {
   // Relations
   jogadas       Jogada[] @relation("JogoJogadas")
   participacoes Participacao[]
+  premios       Premio[] @relation("JogoPremios")
+  sorteio       Sorteio? @relation("JogoSorteio")
   
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+}
+
+// Carrinho de compras persistente (substitui o Map em memória de /api/carrinho)
+model CarrinhoItem {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tipo         String // 'jogo' | 'premio'
+  itemId       String
+  descricao    String
+  precoUnitario Float
+  quantidade   Int      @default(1)
+  imagemUrl    String?
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([userId, itemId, tipo])
+  @@index([userId])
+}
+
+// Prémios das organizações (tombola/raspadinha/rifa) — persistência em DB.
+model Premio {
+  id            String   @id @default(uuid())
+  aldeiaId      String // legacy: id da organização/aldeia
+  org           Organization @relation("OrgPremios", fields: [aldeiaId], references: [id])
+  nome          String
+  titulo        String?
+  descricao     String?
+  valor         Float?
+  valorEstimado Float?
+  imageUrl      String?
+  imagemBase64  String?
+  patrocinador  String?
+  ordem         Int      @default(0)
+  ativo         Boolean  @default(true)
+  codigo        String?  @unique
+  estado        String   @default("disponivel") // disponivel | reservado | resgatado | expirado
+  resgatadoPor  String?
+  dataResgate   DateTime?
+
+  // Relação 1:1 usada pelo validador QR (/api/vendedor/validar-qr)
+  jogoId        String?  @unique
+  jogo          Jogo?    @relation("PremioJogo", fields: [jogoId], references: [id])
+  // Relação N:N usada pelas rotas de prémios, raspadinha e histórico
+  jogos         Jogo[]   @relation("JogoPremios")
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([aldeiaId, estado])
+}
+
+// Sorteios auditáveis (poio da vaca / rifa) com seed + hash SHA-256 verificável.
+model Sorteio {
+  id           String   @id @default(uuid())
+  jogoId       String   @unique
+  jogo         Jogo     @relation("JogoSorteio", fields: [jogoId], references: [id])
+  orgId        String // desnormalizado para queries por organização
+  org          Organization @relation("OrgSorteios", fields: [orgId], references: [id])
+  seed         String
+  hashSeed     String
+  resultado    Json
+  executadoPor String
+  executor     User     @relation("ExecutorSorteios", fields: [executadoPor], references: [id])
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([orgId, createdAt])
 }
 
 model Jogada {

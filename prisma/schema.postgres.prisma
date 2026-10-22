@@ -1,0 +1,395 @@
+// prisma/schema.prisma
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Enums
+enum UserRole {
+  SUPERADMIN
+  ORG_ADMIN
+  VENDEDOR
+  PLAYER
+}
+
+enum UserStatus {
+  ATIVO
+  SUSPENSO
+  INATIVO
+}
+
+enum PaymentMethod {
+  CASH
+  MBWAY_P2P
+  SALDO
+}
+
+enum PaymentStatus {
+  PENDENTE
+  CONFIRMADO
+  DISPUTADO
+  RESOLVIDO
+}
+
+enum JogoStatus {
+  RASCUNHO
+  ATIVO
+  PAUSADO
+  FINALIZADO
+}
+
+enum TipoJogo {
+  RIFA
+  POIO_DA_VACA
+  RASPADINHA
+}
+
+enum TipoAlteracao {
+  ANULACAO
+  ALTERACAO_NUMERO
+  ALTERACAO_CELULA
+}
+
+enum StatusAlteracao {
+  PENDENTE
+  APROVADO
+  REJEITADO
+}
+
+// Legacy Enums (for old seed)
+enum Role {
+  super_admin
+  aldeia_admin
+  vendedor
+  user
+}
+
+enum Estado {
+  rascunho
+  ativo
+  pausado
+  finalized
+}
+
+// Models
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  nome          String
+  telefone      String?
+  password      String
+  passwordHash  String?   // Legacy field
+  role          UserRole
+  status        UserStatus @default(ATIVO)
+  orgId         String?
+  org           Organization? @relation("UserOrg", fields: [orgId], references: [id])
+  
+  // Legacy fields
+  aldeiaId      String?
+  aldeia        Aldeia? @relation(fields: [aldeiaId], references: [id])
+
+  // Player fields
+  saldo         Float  @default(0)
+  comissaoPct   Float  @default(5)
+  
+  // Relations
+  jogadas       Jogada[] @relation("PlayerJogadas")
+  vendas        Jogada[] @relation("VendedorJogadas")
+  recargas      RecargaSaldo[] @relation("PlayerRecargas")
+  recargasFeitas RecargaSaldo[] @relation("VendedorRecargas")
+  solicitacoes  HistoricoAlteracao[] @relation("Solicitante")
+  aprovacoes    HistoricoAlteracao[] @relation("Aprovador")
+  anulacoes     Anulacao[] @relation("AnuladoPor")
+  anulacoesConfirmadas Anulacao[] @relation("ConfirmadoPor")
+  sorteiosExecutados Sorteio[] @relation("ExecutorSorteios")
+  carrinhoItens CarrinhoItem[]
+  
+  // Legacy relations
+  participacoes Participacao[]
+  vendasLegacy Participacao[] @relation("VendedorParticipacoes")
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Organization {
+  id            String   @id @default(uuid())
+  nome          String
+  slug          String  @unique
+  email         String?
+  telefone      String?
+  ativa         Boolean @default(true)
+  modoTeste     Boolean @default(true)
+  limiteUsers   Int     @default(500)
+  limiteStorage Int     @default(1000) // MB
+
+  // Configurações globais / feature flags (Settings do Admin)
+  comissaoPadraoPct Float @default(5)
+  limiteRecargaMax  Float @default(10000)
+  features          Json?
+  
+  // Relations
+  users         User[]   @relation("UserOrg")
+  jogos         Jogo[]   @relation("OrgJogos")
+  premios       Premio[] @relation("OrgPremios")
+  sorteios      Sorteio[] @relation("OrgSorteios")
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// Legacy: Aldeia (Organization)
+model Aldeia {
+  id          String   @id @default(uuid())
+  nome        String
+  descricao   String?
+  localizacao String?
+  
+  // Relations
+  admins      User[] 
+  eventos     Evento[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Plano {
+  id              String   @id @default(uuid())
+  nome            String
+  precoMensal     Float
+  maxEventos      Int
+  maxJogos        Int
+  maxParticipacoes Int
+  descricao       String?
+  
+  createdAt       DateTime @default(now())
+}
+
+model Jogo {
+  id            String   @id @default(uuid())
+  orgId         String
+  org           Organization @relation("OrgJogos", fields: [orgId], references: [id])
+
+  // Campos de raspadinha/tombola (/api/participacoes, /api/jogos/raspadinha)
+  estado            String?
+  premiosRaspadinha Json?
+  stockInicial      Int?
+  stockRestante     Int?
+  limitePorUsuario  Int?
+  tipo          TipoJogo
+  titulo        String
+  descricao     String?
+  config        Json
+  dataInicio    DateTime
+  dataFim       DateTime?
+  status        JogoStatus @default(RASCUNHO)
+  resultadoMocked Json?
+  resultadoReal Json?
+  apiEuromilhoes Boolean @default(false)
+  avisos        Json?
+  
+  // Legacy relations
+  eventoId      String?
+  evento        Evento? @relation(fields: [eventoId], references: [id])
+  precoParticipacao Float?
+  tipoLegacy    String?
+  
+  // Relations
+  jogadas       Jogada[] @relation("JogoJogadas")
+  participacoes Participacao[]
+  premios       Premio[] @relation("JogoPremios")
+  premioPrincipal Premio?  @relation("PremioJogo")
+  sorteio       Sorteio? @relation("JogoSorteio")
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// Carrinho de compras persistente (substitui o Map em memória de /api/carrinho)
+model CarrinhoItem {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tipo         String // 'jogo' | 'premio'
+  itemId       String
+  descricao    String
+  precoUnitario Float
+  quantidade   Int      @default(1)
+  imagemUrl    String?
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([userId, itemId, tipo])
+  @@index([userId])
+}
+
+// Prémios das organizações (tombola/raspadinha/rifa) — persistência em DB.
+model Premio {
+  id            String   @id @default(uuid())
+  aldeiaId      String // legacy: id da organização/aldeia
+  org           Organization @relation("OrgPremios", fields: [aldeiaId], references: [id])
+  nome          String
+  titulo        String?
+  descricao     String?
+  valor         Float?
+  valorEstimado Float?
+  imageUrl      String?
+  imagemBase64  String?
+  patrocinador  String?
+  ordem         Int      @default(0)
+  ativo         Boolean  @default(true)
+  codigo        String?  @unique
+  estado        String   @default("disponivel") // disponivel | reservado | resgatado | expirado
+  resgatadoPor  String?
+  dataResgate   DateTime?
+
+  // Relação 1:1 usada pelo validador QR (/api/vendedor/validar-qr)
+  jogoId        String?  @unique
+  jogo          Jogo?    @relation("PremioJogo", fields: [jogoId], references: [id])
+  // Relação N:N usada pelas rotas de prémios, raspadinha e histórico
+  jogos         Jogo[]   @relation("JogoPremios")
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([aldeiaId, estado])
+}
+
+// Sorteios auditáveis (poio da vaca / rifa) com seed + hash SHA-256 verificável.
+model Sorteio {
+  id           String   @id @default(uuid())
+  jogoId       String   @unique
+  jogo         Jogo     @relation("JogoSorteio", fields: [jogoId], references: [id])
+  orgId        String // desnormalizado para queries por organização
+  org          Organization @relation("OrgSorteios", fields: [orgId], references: [id])
+  seed         String
+  hashSeed     String
+  resultado    Json
+  executadoPor String
+  executor     User     @relation("ExecutorSorteios", fields: [executadoPor], references: [id])
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([orgId, createdAt])
+}
+
+model Jogada {
+  id            String   @id @default(uuid())
+  jogadorId     String
+  jogador       User @relation("PlayerJogadas", fields: [jogadorId], references: [id])
+  vendedorId    String
+  vendedor      User @relation("VendedorJogadas", fields: [vendedorId], references: [id])
+  jogoId        String
+  jogo          Jogo @relation("JogoJogadas", fields: [jogoId], references: [id])
+  tipoJogo      TipoJogo
+  detalhes      Json
+  valor         Float
+  metodoPagamento PaymentMethod
+  statusPagamento PaymentStatus @default(CONFIRMADO)
+  statusJogada  String // ATIVA, ANULADA, CONCLUIDA, PENDENTE_ALTERACAO
+  podeAlterarAte DateTime?
+  sorteioRealizado Boolean @default(false)
+  raspada       Boolean @default(false)
+  coordenadasDefinidas Boolean @default(false)
+  comprovativo  String
+  historico     HistoricoAlteracao[] @relation("JogadaHistorico")
+  anulacao      Anulacao?
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model HistoricoAlteracao {
+  id            String   @id @default(uuid())
+  jogadaId      String
+  jogada        Jogada @relation("JogadaHistorico", fields: [jogadaId], references: [id])
+  tipoAlteracao TipoAlteracao
+  dadosOriginais Json?
+  valorOriginal Float
+  dadosNovos    Json?
+  valorNovo     Float?
+  motivo        String
+  solicitadoPor String
+  solicitante   User @relation("Solicitante", fields: [solicitadoPor], references: [id])
+  aprovadoPor   String?
+  aprovador     User? @relation("Aprovador", fields: [aprovadoPor], references: [id])
+  status        StatusAlteracao @default(PENDENTE)
+  solicitadoEm  DateTime @default(now())
+  resolvidoEm   DateTime?
+  evidenciaUrl  String?
+  
+  createdAt     DateTime @default(now())
+}
+
+model Anulacao {
+  id            String   @id @default(uuid())
+  jogadaId      String  @unique
+  jogada        Jogada @relation(fields: [jogadaId], references: [id])
+  valor         Float
+  motivo        String
+  anuladoPor    String
+  anuladoPorUser User @relation("AnuladoPor", fields: [anuladoPor], references: [id])
+  confirmadoPor String?
+  confirmadoPorUser User? @relation("ConfirmadoPor", fields: [confirmadoPor], references: [id])
+  dataAnulacao  DateTime @default(now())
+  dataReembolso DateTime?
+  
+  createdAt     DateTime @default(now())
+}
+
+model RecargaSaldo {
+  id            String   @id @default(uuid())
+  playerId      String
+  player        User @relation("PlayerRecargas", fields: [playerId], references: [id])
+  vendedorId    String
+  vendedor      User @relation("VendedorRecargas", fields: [vendedorId], references: [id])
+  valor         Float
+  metodo        PaymentMethod
+  comprovativo  String?
+  status        PaymentStatus @default(CONFIRMADO)
+  processadoEm  DateTime @default(now())
+  
+  createdAt     DateTime @default(now())
+}
+
+// Legacy: Evento
+model Evento {
+  id          String   @id @default(uuid())
+  aldeiaId    String
+  aldeia      Aldeia @relation(fields: [aldeiaId], references: [id])
+  nome        String
+  descricao   String?
+  dataInicio  DateTime
+  dataFim     DateTime?
+  estado      String @default("ativo")
+  
+  jogos       Jogo[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Legacy: Participacao
+model Participacao {
+  id          String   @id @default(uuid())
+  jogoId      String
+  jogo        Jogo @relation(fields: [jogoId], references: [id])
+  userId      String
+  user        User @relation(fields: [userId], references: [id])
+  vendedorId  String?
+  vendedor    User? @relation("VendedorParticipacoes", fields: [vendedorId], references: [id])
+  valorPago   Float
+  dadosParticipacao Json?
+  metodoPagamento String?
+  estado      String @default("ativa")
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

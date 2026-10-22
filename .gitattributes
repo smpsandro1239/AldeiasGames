@@ -1,9 +1,0 @@
-*.node filter=lfs
-*.dll filter=lfs
-*.so filter=lfs
-*.exe filter=lfs
-*.zip filter=lfs
-*.mp4 filter=lfs
-*.mov filter=lfs
-*.avi filter=lfs
-*.mp3 filter=lfs*.node filter=lfs

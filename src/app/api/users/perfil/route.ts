@@ -1,22 +1,22 @@
-/**
- * API: /api/users/perfil
- * Gestão do perfil do utilizador
- */
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/db';
+import { getFullUserFromRequest, hashPassword } from '@/lib/auth';
+import { updateProfileSchema } from '@/lib/validations';
+import { saveImage, deleteImage } from '@/lib/storage';
 
-import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { getUserFromRequest } from '@/lib/auth';
-import { hash } from 'bcryptjs';
-
-export async function GET(request: Request) {
+// GET - Obter perfil do utilizador
+export async function GET(request: NextRequest) {
   try {
-    const user = await getUserFromRequest(request);
+    const user = await getFullUserFromRequest(request);
+
     if (!user) {
-      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
+      return NextResponse.json(
+        { error: 'Não autorizado' },
+        { status: 401 }
+      );
     }
 
-    // Buscar dados completos do utilizador
-    const userProfile = await db.user.findUnique({
+    const perfil = await prisma.user.findUnique({
       where: { id: user.id },
       include: {
         aldeia: {
@@ -24,103 +24,158 @@ export async function GET(request: Request) {
             id: true,
             nome: true,
             slug: true,
-            localizacao: true,
-            logoUrl: true
-          }
+            tipoOrganizacao: true,
+          },
         },
         _count: {
           select: {
             participacoes: true,
-            vendas: true,
-            notificacoes: true
-          }
-        }
-      }
+          },
+        },
+      },
     });
 
-    if (!userProfile) {
-      return NextResponse.json({ error: 'Utilizador não encontrado' }, { status: 404 });
+    if (!perfil) {
+      return NextResponse.json(
+        { error: 'Utilizador não encontrado' },
+        { status: 404 }
+      );
     }
 
-    // Remover passwordHash da resposta
-    const { passwordHash, ...profileWithoutPassword } = userProfile as any;
+    // Calcular estatísticas
+    const participacoes = await prisma.participacao.findMany({
+      where: { userId: user.id },
+      select: {
+        valorPago: true,
+        ganhador: true,
+      },
+    });
 
-    return NextResponse.json(profileWithoutPassword);
+    const totalGasto = participacoes.reduce((sum: number, p: any) => sum + p.valorPago, 0);
+    const totalVitorias = participacoes.filter((p: any) => p.ganhador).length;
+
+      return NextResponse.json({
+        success: true,
+        data: {
+          id: perfil.id,
+          email: perfil.email,
+          nome: perfil.nome,
+          telefone: perfil.telefone,
+          role: perfil.role,
+          fotoUrl: perfil.fotoUrl,
+          emailVerificado: perfil.emailVerificado,
+          notificacoesEmail: perfil.notificacoesEmail,
+          ultimoLogin: perfil.ultimoLogin,
+          aldeiaId: perfil.aldeiaId,
+          aldeia: perfil.aldeia,
+          aldeiasPermitidas: perfil.aldeiasPermitidas ? JSON.parse(perfil.aldeiasPermitidas) : null,
+          estatisticas: {
+            totalParticipacoes: perfil._count.participacoes,
+            totalGasto,
+            totalVitorias,
+          },
+          createdAt: perfil.createdAt,
+        },
+      });
   } catch (error) {
     console.error('Erro ao obter perfil:', error);
-    return NextResponse.json({ error: 'Erro ao obter perfil' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Erro interno do servidor' },
+      { status: 500 }
+    );
   }
 }
 
-export async function PATCH(request: Request) {
+// PATCH - Atualizar perfil
+export async function PATCH(request: NextRequest) {
   try {
-    const user = await getUserFromRequest(request);
+    const user = await getFullUserFromRequest(request);
+
     if (!user) {
-      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
+      return NextResponse.json(
+        { error: 'Não autorizado' },
+        { status: 401 }
+      );
     }
 
     const body = await request.json();
-    const { nome, telefone, passwordAtual, novaPassword } = body;
+    const validation = updateProfileSchema.safeParse(body);
 
-    // Se o utilizador quiser mudar a password, verificar a atual
-    if (novaPassword) {
-      if (!passwordAtual) {
-        return NextResponse.json({ 
-          error: 'Password atual é obrigatória para definir nova password' 
-        }, { status: 400 });
-      }
-
-      const userAtual = await db.user.findUnique({
-        where: { id: user.id }
-      });
-
-      if (!userAtual) {
-        return NextResponse.json({ error: 'Utilizador não encontrado' }, { status: 404 });
-      }
-
-      // Verificar password atual (simplificado - em produção usar bcrypt.compare)
-      const isValid = await import('bcryptjs').then(bcrypt => 
-        bcrypt.compare(passwordAtual, userAtual.passwordHash)
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: 'Dados inválidos', details: validation.error.errors },
+        { status: 400 }
       );
-
-      if (!isValid) {
-        return NextResponse.json({ error: 'Password atual incorreta' }, { status: 401 });
-      }
-
-      // Atualizar com nova password
-      const passwordHash = await hash(novaPassword, 12);
-      
-      await db.user.update({
-        where: { id: user.id },
-        data: {
-          nome: nome || undefined,
-          telefone: telefone || undefined,
-          passwordHash
-        }
-      });
-
-      return NextResponse.json({ message: 'Password alterada com sucesso' });
     }
 
-    // Atualizar apenas dados básicos
-    const updatedUser = await db.user.update({
+    const data = validation.data;
+
+    // Foto de perfil
+    let fotoUrl: string | undefined | null;
+    const current = await prisma.user.findUnique({ where: { id: user.id }, select: { fotoUrl: true } });
+
+    if (data.fotoPerfil) {
+      const saved = await saveImage(data.fotoPerfil, 'perfis');
+      fotoUrl = saved.url;
+      if (current?.fotoUrl && current.fotoUrl.startsWith('/uploads/')) {
+        await deleteImage(current.fotoUrl).catch(() => {});
+      }
+    } else if (data.fotoPerfil === null) {
+      fotoUrl = null;
+      if (current?.fotoUrl && current.fotoUrl.startsWith('/uploads/')) {
+        await deleteImage(current.fotoUrl).catch(() => {});
+      }
+    }
+
+    const updateData: Record<string, unknown> = {
+      nome: data.nome,
+      telefone: data.telefone,
+      notificacoesEmail: data.notificacoesEmail,
+    };
+
+    if (fotoUrl !== undefined) {
+      updateData.fotoUrl = fotoUrl;
+    }
+
+    if (data.aldeiaId) {
+      updateData.aldeiaId = data.aldeiaId;
+    }
+
+    if (data.aldeiasPermitidas) {
+      updateData.aldeiasPermitidas = JSON.stringify({
+        aldeias: data.aldeiasPermitidas.map(a => ({
+          ...a,
+          dataAdicao: new Date().toISOString(),
+        })),
+      });
+    }
+
+    const updated = await prisma.user.update({
       where: { id: user.id },
-      data: {
-        nome: nome,
-        telefone: telefone
-      },
+      data: updateData,
       select: {
         id: true,
-        nome: true,
         email: true,
+        nome: true,
         telefone: true,
-        role: true
-      }
+        role: true,
+        fotoUrl: true,
+        notificacoesEmail: true,
+        ultimoLogin: true,
+        aldeiaId: true,
+      },
     });
 
-    return NextResponse.json(updatedUser);
+    return NextResponse.json({
+      success: true,
+      message: 'Perfil atualizado com sucesso',
+      data: updated,
+    });
   } catch (error) {
     console.error('Erro ao atualizar perfil:', error);
-    return NextResponse.json({ error: 'Erro ao atualizar perfil' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Erro interno do servidor' },
+      { status: 500 }
+    );
   }
 }

@@ -1,0 +1,73 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
+import { prisma } from '@/lib/db';
+import { getFullUserFromRequest } from '@/lib/auth';
+import { requirePermission } from '@/lib/rbac/checkPermission';
+
+export async function GET(request: NextRequest) {
+  try {
+    const user = await getFullUserFromRequest(request);
+    if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+    const denied = await requirePermission(user.id, 'MANAGE_USERS');
+    if (denied) return denied;
+
+    const aldeias = await prisma.aldeia.findMany({
+      where: { ativo: true },
+      include: {
+        vault: {
+          include: {
+            transacoes: {
+              orderBy: { dataCriacao: 'desc' },
+              take: 50,
+            }
+          }
+        },
+        _count: {
+          select: { users: { where: { role: 'vendedor' } } }
+        }
+      }
+    });
+
+    const pendentes = await prisma.pedidoDepositoCofre.findMany({
+      where: { estado: 'pendente' },
+      include: {
+        vendedor: { select: { id: true, nome: true } },
+        aldeia: { select: { id: true, nome: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const data = aldeias.map((aldeia: Prisma.AldeiaGetPayload<{ include: { vault: { include: { transacoes: true } }, _count: { select: { users: true } } } }>) => ({
+      id: aldeia.id,
+      nome: aldeia.nome,
+      slug: aldeia.slug,
+      saldoCofre: aldeia.vault?.saldo || 0,
+      numVendedores: aldeia._count.users,
+      movimentosRecentes: aldeia.vault?.transacoes || [],
+      totalAngariado: aldeia.vault?.transacoes
+        .filter((t: any) => t.tipo === 'deposito')
+        .reduce((sum: number, t: any) => sum + t.valor, 0) || 0,
+    }));
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        aldeias: data,
+        pendentes: pendentes.map((p: Prisma.PedidoDepositoCofreGetPayload<{ include: { vendedor: { select: { id: true; nome: true } }; aldeia: { select: { id: true; nome: true } } } }>) => ({
+          id: p.id,
+          valor: p.valor,
+          descricao: p.descricao,
+          estado: p.estado,
+          createdAt: p.createdAt,
+          vendedor: p.vendedor,
+          aldeia: p.aldeia,
+        })),
+        totalGeral: data.reduce((sum: number, a: (typeof data)[number]) => sum + a.saldoCofre, 0),
+        totalPendentes: pendentes.reduce((sum: number, p: any) => sum + p.valor, 0),
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching superadmin cofre:', error);
+    return NextResponse.json({ error: 'Erro interno' }, { status: 500 });
+  }
+}

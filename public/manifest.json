@@ -1,0 +1,20 @@
+{
+  "name": "Aldeias Games",
+  "short_name": "AldeiasGames",
+  "description": "Plataforma de angariação de fundos para comunidades locais portuguesas",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#110d0c",
+  "theme_color": "#ff734b",
+  "orientation": "portrait",
+  "scope": "/",
+  "lang": "pt-PT",
+  "icons": [
+    {
+      "src": "/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

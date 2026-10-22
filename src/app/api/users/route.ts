@@ -1,147 +1,125 @@
-import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { getUserFromRequest, hashPassword } from '@/lib/auth';
+import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
+import { prisma } from '@/lib/db';
+import { getFullUserFromRequest } from '@/lib/auth';
+import { requirePermission } from '@/lib/rbac/checkPermission';
+import { createUserSchema } from '@/lib/validations';
+import bcrypt from 'bcryptjs';
+import { getPaginationFromRequest, createPagination, createPaginatedResponse } from '@/lib/pagination';
 
-// GET - Listar utilizadores por aldeia (para aldeia_admin)
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
-    const user = await getUserFromRequest(request);
+    const user = await getFullUserFromRequest(request);
 
-    if (!user) {
-      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
-    }
+    if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+    const denied = await requirePermission(user.id, 'MANAGE_ALDEIA');
+    if (denied) return denied;
 
     const { searchParams } = new URL(request.url);
     const aldeiaId = searchParams.get('aldeiaId');
-    const role = searchParams.get('role');
+    const { page, limit } = getPaginationFromRequest(request);
 
-    // Super admin pode ver todos ou filtrar por aldeia
-    if (user.role === 'super_admin') {
-      const where: any = {};
-      if (aldeiaId) where.aldeiaId = aldeiaId;
-      if (role) where.role = role;
+    const where: Prisma.UserWhereInput = {};
+    if (user.role === 'aldeia_admin') {
+      where.aldeiaId = user.aldeiaId;
+    } else if (aldeiaId) {
+      where.aldeiaId = aldeiaId;
+    }
 
-      const users = await db.user.findMany({
+    const { skip, take } = createPagination(page, limit);
+
+    const [users, total] = await Promise.all([
+      prisma.user.findMany({
         where,
         select: {
           id: true,
           nome: true,
           email: true,
+          telefone: true,
           role: true,
           aldeiaId: true,
+          vaultPinEnabled: true,
+          comissaoAtiva: true,
+          emailVerificado: true,
           createdAt: true,
-          aldeia: {
-            select: { id: true, nome: true }
-          }
         },
-        orderBy: { createdAt: 'desc' }
-      });
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take,
+      }),
+      prisma.user.count({ where }),
+    ]);
 
-      return NextResponse.json(users);
-    }
-
-    // Aldeia admin só pode ver utilizadores da sua aldeia
-    if (user.role === 'aldeia_admin' && user.aldeiaId) {
-      const where: any = { aldeiaId: user.aldeiaId };
-      if (role) where.role = role;
-
-      const users = await db.user.findMany({
-        where,
-        select: {
-          id: true,
-          nome: true,
-          email: true,
-          role: true,
-          aldeiaId: true,
-          createdAt: true
-        },
-        orderBy: { createdAt: 'desc' }
-      });
-
-      return NextResponse.json(users);
-    }
-
-    return NextResponse.json({ error: 'Sem permissão' }, { status: 403 });
+    return NextResponse.json(createPaginatedResponse(users, total, page, limit));
   } catch (error) {
-    console.error('Erro ao buscar utilizadores:', error);
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 });
   }
 }
 
-// POST - Criar novo utilizador (vendedor) para a aldeia
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const user = await getUserFromRequest(request);
+    const adminUser = await getFullUserFromRequest(request);
 
-    if (!user) {
-      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
-    }
+    if (!adminUser) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+    const denied = await requirePermission(adminUser.id, 'MANAGE_ALDEIA');
+    if (denied) return denied;
 
     const body = await request.json();
-    const { nome, email, password, role, aldeiaId } = body;
+    const validation = createUserSchema.safeParse(body);
 
-    // Validações
-    if (!nome || !email || !password) {
-      return NextResponse.json({ error: 'Nome, email e password são obrigatórios' }, { status: 400 });
+    if (!validation.success) {
+      return NextResponse.json({ error: 'Dados inválidos', details: validation.error.errors }, { status: 400 });
     }
 
-    // Determinar aldeiaId
-    let targetAldeiaId = aldeiaId;
+    const data = validation.data;
 
-    if (user.role === 'aldeia_admin') {
-      // Aldeia admin só pode criar utilizadores para a sua aldeia
-      targetAldeiaId = user.aldeiaId;
-      if (!targetAldeiaId) {
-        return NextResponse.json({ error: 'Utilizador não está associado a nenhuma aldeia' }, { status: 400 });
+    if (adminUser.role === 'aldeia_admin') {
+      if (data.role === 'super_admin') {
+         return NextResponse.json({ error: 'Não pode criar super_admin' }, { status: 403 });
       }
-    } else if (user.role === 'super_admin') {
-      // Super admin pode criar utilizadores com ou sem aldeiaId
-      // No entanto, para vendedores e admins de aldeia, o aldeiaId é recomendado.
-      // Se o role for super_admin, o aldeiaId pode ser nulo.
-      if (!targetAldeiaId && role !== 'super_admin') {
-        // Opcional: manter como alerta ou permitir nulo na DB
-        // Para consistência, se não for super_admin, pedimos aldeia
+      data.aldeiaId = adminUser.aldeiaId as string;
+    }
+
+    // Validação de aldeia obrigatória para certos papéis
+    if ((data.role === 'vendedor' || data.role === 'aldeia_admin') && !data.aldeiaId) {
+      return NextResponse.json(
+        { error: 'Vendedores e administradores de aldeia devem estar vinculados a uma aldeia' },
+        { status: 400 }
+      );
+    }
+
+    const existing = await prisma.user.findUnique({ where: { email: data.email } });
+    if (existing) {
+      return NextResponse.json({ error: 'Email já registado' }, { status: 400 });
+    }
+
+    // Validate aldeiaId references an existing aldeia
+    if (data.aldeiaId) {
+      const aldeiaExists = await prisma.aldeia.findUnique({
+        where: { id: data.aldeiaId },
+        select: { id: true }
+      });
+      if (!aldeiaExists) {
+        return NextResponse.json({ error: 'Aldeia não encontrada' }, { status: 400 });
       }
-    } else {
-      return NextResponse.json({ error: 'Sem permissão para criar utilizadores' }, { status: 403 });
     }
 
-    // Verificar se email já existe
-    const existingUser = await db.user.findUnique({
-      where: { email }
-    });
+    const hashedPassword = await bcrypt.hash(data.password, 10);
 
-    if (existingUser) {
-      return NextResponse.json({ error: 'Email já está em uso' }, { status: 409 });
-    }
-
-    // Criar utilizador
-    const passwordHash = await hashPassword(password);
-
-    const newUser = await db.user.create({
+    const newUser = await prisma.user.create({
       data: {
-        nome,
-        email,
-        passwordHash,
-        role: role || 'vendedor',
-        aldeiaId: targetAldeiaId
+        nome: data.nome,
+        email: data.email,
+        password: hashedPassword,
+        telefone: data.telefone,
+        role: data.role as any,
+        aldeiaId: data.aldeiaId,
       },
-      select: {
-        id: true,
-        nome: true,
-        email: true,
-        role: true,
-        aldeiaId: true,
-        createdAt: true,
-        aldeia: {
-          select: { id: true, nome: true }
-        }
-      }
+      select: { id: true, nome: true, email: true, role: true, aldeiaId: true }
     });
 
-    return NextResponse.json(newUser, { status: 201 });
+    return NextResponse.json({ success: true, data: newUser }, { status: 201 });
   } catch (error) {
-    console.error('Erro ao criar utilizador:', error);
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 });
   }
 }

@@ -1,99 +1,247 @@
-// @ts-nocheck
-import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { getUserFromRequest } from '@/lib/auth';
-import { saveBase64Image } from '@/lib/storage';
-import { eventoSchema } from '@/lib/validations';
-import { ZodError } from 'zod';
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/db';
+import { getFullUserFromRequest } from '@/lib/auth';
+import { requirePermission } from '@/lib/rbac/checkPermission';
+import { createEventoSchema } from '@/lib/validations';
+import { saveImage } from '@/lib/storage';
+import { getPaginationFromRequest, createPaginatedResponse } from '@/lib/pagination';
+import { generateSlug } from '@/lib/utils';
 
-export async function GET(request: Request) {
+// GET - Listar eventos
+export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const aldeiaId = searchParams.get('aldeiaId');
-    
-    // Verificar utilizador para filtrar por aldeia
-    const currentUser = await getUserFromRequest(request);
-    let userAldeiaId = aldeiaId;
-    
-    // Se é aldeia_admin e não forneceu aldeiaId, usar a sua aldeia
-    if (!aldeiaId && currentUser?.role === 'aldeia_admin') {
-      const user = await db.user.findUnique({ where: { id: currentUser.id } });
-      userAldeiaId = user?.aldeiaId || null;
-    }
-    
-    const where = userAldeiaId ? { aldeiaId: userAldeiaId } : {};
-    
-    const eventos = await db.evento.findMany({
-      where,
-      include: {
-        aldeia: {
-          select: { id: true, nome: true, slug: true }
-        },
-        _count: {
-          select: { jogos: true }
-        }
-      },
-      orderBy: { createdAt: 'desc' }
-    });
+    const user = await getFullUserFromRequest(request);
+    const { page, limit } = getPaginationFromRequest(request);
+    const skip = (page - 1) * limit;
 
-    return NextResponse.json(eventos);
+    const url = new URL(request.url);
+    const aldeiaId = url.searchParams.get('aldeiaId');
+    const publico = url.searchParams.get('publico');
+    const incluirEliminados = url.searchParams.get('incluirEliminados') === 'true';
+
+    // Construir where
+    // Eventos eliminados (soft-delete) nunca aparecem em listas públicas
+    let where: Record<string, unknown> = incluirEliminados ? {} : { eliminado: false };
+
+    if (aldeiaId) {
+      where.aldeiaId = aldeiaId;
+    }
+
+    if (publico === 'true') {
+      where.publico = true;
+      where.estado = 'ativo';
+    }
+
+    if (user) {
+      if (user.role === 'aldeia_admin' && !aldeiaId && user.aldeiaId) {
+        // Admin só vê eventos da sua aldeia
+        where.aldeiaId = user.aldeiaId;
+      } else if (user.role === 'vendedor' && !aldeiaId && user.aldeiaId) {
+        // Vendedor só vê eventos da sua aldeia
+        where.aldeiaId = user.aldeiaId;
+      } else if (user.role === 'user' && !aldeiaId && user.aldeiaId) {
+        // User normal só vê eventos da sua aldeia (se tiver aldeia associada)
+        where.aldeiaId = user.aldeiaId;
+      } else if (user.role === 'user' && !user.aldeiaId && !aldeiaId) {
+        // User sem aldeia - mostra eventos públicos
+        where.publico = true;
+        where.estado = 'ativo';
+      }
+      // Super admin vê todos
+    } else {
+      // Não autenticado só vê públicos
+      where.publico = true;
+      where.estado = 'ativo';
+    }
+
+    const [eventos, total] = await Promise.all([
+      prisma.evento.findMany({
+        where,
+        include: {
+          aldeia: {
+            select: {
+              id: true,
+              nome: true,
+              slug: true,
+              tipoOrganizacao: true,
+              logoUrl: true,
+            },
+          },
+          jogos: {
+            select: {
+              id: true,
+              nome: true,
+              tipo: true,
+              preco: true,
+              stockInicial: true,
+              estado: true,
+            },
+          },
+        },
+        skip,
+        take: limit,
+        orderBy: { dataInicio: 'desc' },
+      }),
+      prisma.evento.count({ where }),
+    ]);
+
+    return NextResponse.json(
+      createPaginatedResponse(eventos, total, page, limit)
+    );
   } catch (error) {
-    console.error('Erro ao buscar eventos:', error);
-    return NextResponse.json({ error: 'Erro ao buscar eventos' }, { status: 500 });
+    console.error('Erro ao listar eventos:', error);
+    return NextResponse.json(
+      { error: 'Erro interno do servidor' },
+      { status: 500 }
+    );
   }
 }
 
-export async function POST(request: Request) {
+// POST - Criar evento
+export async function POST(request: NextRequest) {
   try {
-    const user = await getUserFromRequest(request);
-    
-    if (!user || !['super_admin', 'aldeia_admin'].includes(user.role)) {
-      return NextResponse.json({ error: 'Não autorizado' }, { status: 403 });
-    }
+    const user = await getFullUserFromRequest(request);
+
+    if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+    const denied = await requirePermission(user.id, 'MANAGE_ALDEIA');
+    if (denied) return denied;
 
     const body = await request.json();
-    const validatedData = eventoSchema.parse(body);
+    const validation = createEventoSchema.safeParse(body);
 
-    if (user.role === 'aldeia_admin' && user.aldeiaId !== validatedData.aldeiaId) {
-      return NextResponse.json({ error: 'Não tem permissão para esta aldeia' }, { status: 403 });
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: 'Dados inválidos', details: validation.error.errors },
+        { status: 400 }
+      );
     }
 
-    let finalImageUrl = (validatedData as any).imageUrl || null;
-    if (validatedData.imagemBase64) {
-      finalImageUrl = await saveBase64Image(validatedData.imagemBase64);
+    const data = validation.data;
+
+    // Verificar permissão para criar nesta aldeia
+    if (user.role === 'aldeia_admin' && data.aldeiaId !== user.aldeiaId) {
+      return NextResponse.json(
+        { error: 'Não pode criar eventos para outra aldeia' },
+        { status: 403 }
+      );
     }
 
-    const tituloLower = (validatedData as any).nome || (validatedData as any).titulo || '';
-    const generatedSlug = (validatedData as any).slug || (typeof tituloLower === 'string' ? tituloLower
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '') : null);
-
-    const evento = await db.evento.create({
-      data: {
-        aldeiaId: validatedData.aldeiaId,
-        titulo: (validatedData as any).nome || (validatedData as any).titulo || '',
-        descricao: (validatedData as any).descricao,
-        dataInicio: new Date(validatedData.dataInicio),
-        dataFim: validatedData.dataFim ? new Date(validatedData.dataFim) : undefined,
-        estado: (validatedData as any).estado || 'ativo',
-        objectivoAngariacao: (validatedData as any).objectivoAngariacao,
-        imagemBase64: null,
-        imageUrl: finalImageUrl,
-        slug: generatedSlug,
-        ativo: true,
-      },
-      include: { aldeia: true }
+    // Gerar slug único
+    let slug = generateSlug(data.nome);
+    const existingSlug = await prisma.evento.findUnique({
+      where: { slug },
     });
 
-    return NextResponse.json(evento, { status: 201 });
-  } catch (error) {
-    if (error instanceof ZodError) {
-      return NextResponse.json({ error: error.issues[0].message }, { status: 400 });
+    if (existingSlug) {
+      slug = `${slug}-${Date.now()}`;
     }
+
+    // Processar imagem se fornecida
+    let imagemUrl: string | undefined;
+    if (data.imagemBase64) {
+      const saved = await saveImage(data.imagemBase64, 'eventos');
+      imagemUrl = saved.url;
+    }
+
+    const dInicio = new Date(data.dataInicio);
+    const dFim = new Date(data.dataFim);
+
+    if (isNaN(dInicio.getTime()) || isNaN(dFim.getTime())) {
+      return NextResponse.json({ error: 'Datas inválidas' }, { status: 400 });
+    }
+
+    // Calcular próxima data para recorrência
+    let proximaData: Date | undefined;
+    if (data.isRecurring && data.recurrenceFrequency && data.recurrenceDayOfWeek !== undefined && data.recurrenceTime) {
+      const now = new Date();
+      const [hours, minutes] = data.recurrenceTime.split(':').map(Number);
+
+      // Encontrar a próxima ocorrência
+      let nextOccurrence = new Date(now);
+      nextOccurrence.setHours(hours, minutes, 0, 0);
+
+      // Ajustar para o próximo dia da semana correto
+      const currentDay = nextOccurrence.getDay();
+      const targetDay = data.recurrenceDayOfWeek;
+      let daysToAdd = targetDay - currentDay;
+
+      if (daysToAdd <= 0) {
+        // Se já passou hoje, ir para a próxima semana/quinzena/mês
+        if (data.recurrenceFrequency === 'semanal') {
+          daysToAdd += 7;
+        } else if (data.recurrenceFrequency === 'quinzenal') {
+          daysToAdd += 14;
+        } else if (data.recurrenceFrequency === 'mensal') {
+          // Para mensal, calcular próximo mês
+          nextOccurrence.setMonth(nextOccurrence.getMonth() + 1);
+          nextOccurrence.setDate(1); // Primeiro dia do mês
+          // Encontrar o dia da semana correto
+          while (nextOccurrence.getDay() !== targetDay) {
+            nextOccurrence.setDate(nextOccurrence.getDate() + 1);
+          }
+        }
+      } else {
+        if (data.recurrenceFrequency === 'quinzenal') {
+          daysToAdd += 7; // Pular uma semana para quinzenal
+        } else if (data.recurrenceFrequency === 'mensal') {
+          // Para mensal, ir para o próximo mês
+          nextOccurrence.setMonth(nextOccurrence.getMonth() + 1);
+          nextOccurrence.setDate(1);
+          while (nextOccurrence.getDay() !== targetDay) {
+            nextOccurrence.setDate(nextOccurrence.getDate() + 1);
+          }
+        }
+      }
+
+      if (data.recurrenceFrequency !== 'mensal') {
+        nextOccurrence.setDate(nextOccurrence.getDate() + daysToAdd);
+      }
+
+      proximaData = nextOccurrence;
+    }
+
+    // Criar evento
+    const evento = await prisma.evento.create({
+      data: {
+        nome: data.nome,
+        slug,
+        descricao: data.descricao,
+        imagemUrl,
+        imagemBase64: data.imagemBase64,
+        dataInicio: new Date(data.dataInicio),
+        dataFim: new Date(data.dataFim),
+        objectivoAngariacao: data.objectivoAngariacao,
+        estado: data.estado,
+        publico: data.publico,
+        aldeiaId: data.aldeiaId,
+        // Recorrência
+        isTemplate: data.isRecurring || false,
+        templateNome: data.isRecurring ? data.nome : undefined,
+        frequenciaRecorrencia: data.recurrenceFrequency || undefined,
+        diaSemanaRecorrencia: data.recurrenceDayOfWeek,
+        proximaData,
+        maxOcorrencias: data.isRecurring ? data.maxOccurrences : undefined,
+      },
+      include: {
+        aldeia: {
+          select: {
+            id: true,
+            nome: true,
+            slug: true,
+          },
+        },
+      },
+    });
+
+    return NextResponse.json(
+      { success: true, data: evento },
+      { status: 201 }
+    );
+  } catch (error) {
     console.error('Erro ao criar evento:', error);
-    return NextResponse.json({ error: 'Erro ao criar evento' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Erro interno do servidor' },
+      { status: 500 }
+    );
   }
 }

@@ -1,97 +1,211 @@
-// Aldeias Games - Service Worker v2
-const CACHE_NAME = 'aldeias-games-v2';
-const STATIC_CACHE = 'aldeias-static-v2';
+/**
+ * Service Worker - Aldeias Games PWA
+ * Versão 3.11.0
+ */
 
-// Apenas assets estáticos para cache
+const CACHE_NAME = "aldeias-games-v3.11.0";
 const STATIC_ASSETS = [
-  '/',
-  '/logo.svg',
-  '/robots.txt'
+  "/",
+  "/manifest.json",
+  "/favicon.svg",
 ];
 
-// Instalar e cachear apenas assets estáticos
-self.addEventListener('install', (event) => {
+// Instalação - Cachear assets estáticos
+self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(STATIC_CACHE).then((cache) => {
-      console.log('[SW] A cachear assets estáticos...');
-      return cache.addAll(STATIC_ASSETS);
-    }).then(() => self.skipWaiting())
+    caches
+      .open(CACHE_NAME)
+      .then((cache) => {
+        console.log("[SW] Cacheando assets estáticos");
+        return cache.addAll(STATIC_ASSETS);
+      })
+      .catch((err) => {
+        console.error("[SW] Erro ao cachear assets:", err);
+      })
   );
+  self.skipWaiting();
 });
 
-// Ativar e limpar caches antigos
-self.addEventListener('activate', (event) => {
+// Ativação - Limpar caches antigos
+self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames
-          .filter((name) => name !== CACHE_NAME && name !== STATIC_CACHE)
-          .map((name) => {
-            console.log('[SW] A remover cache antigo:', name);
-            return caches.delete(name);
-          })
-      );
-    }).then(() => self.clients.claim())
-  );
-});
-
-// Estratégia: Network-First para API, Cache-First para estáticos
-self.addEventListener('fetch', (event) => {
-  const url = new URL(event.request.url);
-
-  // NUNCA cachear chamadas de API - dados dinâmicos sempre frescos
-  if (url.pathname.startsWith('/api/')) {
-    event.respondWith(
-      fetch(event.request).catch(() => {
-        return new Response(
-          JSON.stringify({ error: 'Sem ligação à internet' }),
-          { status: 503, headers: { 'Content-Type': 'application/json' } }
+    caches
+      .keys()
+      .then((cacheNames) => {
+        return Promise.all(
+          cacheNames
+            .filter((name) => name !== CACHE_NAME)
+            .map((name) => {
+              console.log("[SW] Eliminando cache antigo:", name);
+              return caches.delete(name);
+            })
         );
       })
-    );
+      .then(() => {
+        console.log("[SW] Service Worker ativado");
+        return self.clients.claim();
+      })
+  );
+});
+
+// Fetch - Estratégia Cache First, depois Network
+self.addEventListener("fetch", (event) => {
+  const { request } = event;
+  const url = new URL(request.url);
+
+  // Ignorar requisições de API
+  if (url.pathname.startsWith("/api/")) {
     return;
   }
 
-  // Cache-First para assets estáticos (imagens, fontes, etc.)
-  if (
-    url.pathname.startsWith('/uploads/') ||
-    url.pathname.endsWith('.svg') ||
-    url.pathname.endsWith('.png') ||
-    url.pathname.endsWith('.ico') ||
-    url.pathname.endsWith('.woff2')
-  ) {
+  // Ignorar requisições de analytics
+  if (url.hostname.includes("google-analytics") || url.hostname.includes("googletagmanager")) {
+    return;
+  }
+
+  // Estratégia para assets estáticos
+  if (request.destination === "image" || request.destination === "style" || request.destination === "script") {
     event.respondWith(
-      caches.match(event.request).then((cached) => {
-        return cached || fetch(event.request).then((response) => {
-          const clone = response.clone();
-          caches.open(STATIC_CACHE).then((cache) => cache.put(event.request, clone));
-          return response;
-        });
+      caches.match(request).then((cached) => {
+        if (cached) {
+          // Atualizar cache em background
+          fetch(request)
+            .then((response) => {
+              if (response.ok) {
+                caches.open(CACHE_NAME).then((cache) => {
+                  cache.put(request, response);
+                });
+              }
+            })
+            .catch(() => {});
+          return cached;
+        }
+
+        return fetch(request)
+          .then((response) => {
+            if (!response || response.status !== 200 || response.type !== "basic") {
+              return response;
+            }
+
+            const responseToCache = response.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(request, responseToCache);
+            });
+
+            return response;
+          })
+          .catch(() => {
+            // Retornar fallback offline se disponível
+            if (request.destination === "image") {
+              return caches.match("/favicon.svg");
+            }
+            return new Response("Offline", { status: 503 });
+          });
       })
     );
     return;
   }
 
-  // Network-First para navegação de páginas
+  // Estratégia Network First para páginas HTML
+  if (request.mode === "navigate" || request.destination === "document") {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response.ok) {
+            const responseToCache = response.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(request, responseToCache);
+            });
+          }
+          return response;
+        })
+        .catch(() => {
+          return caches.match(request).then((cached) => {
+            if (cached) {
+              return cached;
+            }
+            return caches.match("/");
+          });
+        })
+    );
+    return;
+  }
+
+  // Default: Cache First
   event.respondWith(
-    fetch(event.request).catch(() => caches.match('/'))
+    caches.match(request).then((cached) => {
+      if (cached) {
+        return cached;
+      }
+      return fetch(request);
+    })
   );
 });
 
 // Push Notifications
-self.addEventListener('push', (event) => {
-  const data = event.data ? event.data.json() : {};
-  const title = data.title || 'Aldeias Games';
+self.addEventListener("push", (event) => {
+  if (!event.data) return;
+
+  const data = event.data.json();
   const options = {
-    body: data.body || 'Tens uma nova notificação!',
-    icon: '/logo.svg',
-    badge: '/logo.svg',
-    data: data.url || '/',
+    body: data.message || "Nova notificação",
+    icon: "/favicon.svg",
+    badge: "/favicon.svg",
+    tag: data.tag || "default",
+    requireInteraction: data.requireInteraction || false,
+    data: data.data || {},
+    actions: data.actions || [],
   };
-  event.waitUntil(self.registration.showNotification(title, options));
+
+  event.waitUntil(
+    self.registration.showNotification(data.title || "Aldeias Games", options)
+  );
 });
 
-self.addEventListener('notificationclick', (event) => {
+// Click em notificação
+self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  event.waitUntil(clients.openWindow(event.notification.data));
+
+  const notificationData = event.notification.data;
+  let url = "/";
+
+  if (notificationData?.url) {
+    url = notificationData.url;
+  }
+
+  event.waitUntil(
+    self.clients
+      .matchAll({ type: "window", includeUncontrolled: true })
+      .then((clientList) => {
+        // Se já há uma janela aberta, focar nela
+        for (const client of clientList) {
+          if (client.url === url && "focus" in client) {
+            return client.focus();
+          }
+        }
+        // Senão, abrir nova janela
+        if (self.clients.openWindow) {
+          return self.clients.openWindow(url);
+        }
+      })
+  );
+});
+
+// Background Sync (para quando voltar online)
+self.addEventListener("sync", (event) => {
+  if (event.tag === "sync-pending-actions") {
+    event.waitUntil(syncPendingActions());
+  }
+});
+
+async function syncPendingActions() {
+  // Implementar sincronização de ações pendentes
+  console.log("[SW] Sincronizando ações pendentes...");
+}
+
+// Mensagens do cliente
+self.addEventListener("message", (event) => {
+  if (event.data === "skipWaiting") {
+    self.skipWaiting();
+  }
 });

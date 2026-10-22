@@ -1,0 +1,23 @@
+{
+  "framework": "nextjs",
+  "buildCommand": "node scripts/gen-postgres-schema.js && npx prisma@6.19.3 generate --schema=prisma/schema.postgres.prisma && rm -rf .next && next build",
+  "installCommand": "npm install",
+  "crons": [
+    {
+      "path": "/api/euromilhoes/recorrentes",
+      "schedule": "0 22 * * 5"
+    },
+    {
+      "path": "/api/rgpd/anonimizacao",
+      "schedule": "0 3 * * 1"
+    },
+    {
+      "path": "/api/rgpd/purga",
+      "schedule": "0 4 * * 1"
+    },
+    {
+      "path": "/api/rate-limits/cleanup",
+      "schedule": "30 2 * * *"
+    }
+  ]
+}

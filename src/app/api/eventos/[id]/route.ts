@@ -1,118 +1,321 @@
-import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { getUserFromRequest } from '@/lib/auth';
+import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
+import { prisma } from '@/lib/db';
+import { getFullUserFromRequest } from '@/lib/auth';
+import { requirePermission } from '@/lib/rbac/checkPermission';
+import { updateEventoSchema } from '@/lib/validations';
+import { saveImage } from '@/lib/storage';
+import { logCRUD as logAudit } from '@/lib/audit';
 
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+interface RouteContext {
+  params: Promise<{ id: string }>
+}
+
+// Função robusta para calcular próxima data de recorrência
+function calculateNextRecurrenceDate(
+  frequency: 'semanal' | 'quinzenal' | 'mensal',
+  dayOfWeek: number, // 0=Domingo, 6=Sábado
+  time: string // formato HH:MM
+): Date {
+  const now = new Date();
+  const [hours, minutes] = time.split(':').map(Number);
+
+  if (isNaN(hours) || isNaN(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+    throw new Error('Horário inválido');
+  }
+
+  let nextDate = new Date(now);
+
+  if (frequency === 'semanal') {
+    // Próxima ocorrência da semana
+    const currentDay = now.getDay();
+    const daysUntilTarget = (dayOfWeek - currentDay + 7) % 7;
+
+    if (daysUntilTarget === 0) {
+      // Mesmo dia da semana - verificar se já passou
+      const currentTime = now.getHours() * 60 + now.getMinutes();
+      const targetTime = hours * 60 + minutes;
+
+      if (currentTime >= targetTime) {
+        // Já passou hoje, próxima semana
+        nextDate.setDate(now.getDate() + 7);
+      }
+    } else {
+      // Próximo dia da semana
+      nextDate.setDate(now.getDate() + daysUntilTarget);
+    }
+  } else if (frequency === 'quinzenal') {
+    // A cada duas semanas
+    const currentDay = now.getDay();
+    const daysUntilTarget = (dayOfWeek - currentDay + 7) % 7;
+
+    if (daysUntilTarget === 0) {
+      const currentTime = now.getHours() * 60 + now.getMinutes();
+      const targetTime = hours * 60 + minutes;
+
+      if (currentTime >= targetTime) {
+        // Já passou, próxima quinzena
+        nextDate.setDate(now.getDate() + 14);
+      }
+    } else {
+      nextDate.setDate(now.getDate() + daysUntilTarget);
+    }
+  } else if (frequency === 'mensal') {
+    // Todo mês no mesmo dia da semana
+    const currentDay = now.getDay();
+    const targetDay = dayOfWeek;
+
+    // Encontrar o próximo mês
+    nextDate.setMonth(now.getMonth() + 1);
+    nextDate.setDate(1); // Primeiro dia do próximo mês
+
+    // Encontrar o dia da semana correto
+    const firstDayOfMonth = nextDate.getDay();
+    const daysToAdd = (targetDay - firstDayOfMonth + 7) % 7;
+
+    nextDate.setDate(nextDate.getDate() + daysToAdd);
+  }
+
+  // Definir horário
+  nextDate.setHours(hours, minutes, 0, 0);
+
+  return nextDate;
+}
+
+export async function GET(request: NextRequest, context: RouteContext) {
   try {
-    const { id } = await params;
-
-    const evento = await db.evento.findUnique({
+    const { id } = await context.params;
+    const evento = await prisma.evento.findUnique({
       where: { id },
       include: {
         aldeia: true,
         jogos: {
-          include: {
-            _count: {
-              select: { participacoes: true }
-            }
+          select: {
+            id: true,
+            nome: true,
+            tipo: true,
+            preco: true,
+            stockInicial: true,
+            estado: true
           }
         }
       }
     });
-
-    if (!evento) {
-      return NextResponse.json(
-        { error: 'Evento não encontrado' },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json(evento);
+    if (!evento) return NextResponse.json({ error: 'Evento não encontrado' }, { status: 404 });
+    return NextResponse.json({ data: evento });
   } catch (error) {
-    console.error('Erro ao buscar evento:', error);
-    return NextResponse.json(
-      { error: 'Erro ao buscar evento' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Erro interno' }, { status: 500 });
   }
 }
 
-export async function PATCH(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PATCH(request: NextRequest, context: RouteContext) {
   try {
-    const user = await getUserFromRequest(request);
+    const { id } = await context.params;
+    const user = await getFullUserFromRequest(request);
 
-    if (!user || !['super_admin', 'aldeia_admin'].includes(user.role)) {
-      return NextResponse.json(
-        { error: 'Não autorizado' },
-        { status: 403 }
-      );
+    if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+    const denied = await requirePermission(user.id, 'MANAGE_ALDEIA');
+    if (denied) return denied;
+
+    const evento = await prisma.evento.findUnique({ where: { id } });
+    if (!evento) {
+      return NextResponse.json({ error: 'Evento não encontrado' }, { status: 404 });
     }
 
-    const { id } = await params;
+    if (user.role === 'aldeia_admin' && user.aldeiaId !== evento.aldeiaId) {
+      return NextResponse.json({ error: 'Não autorizado' }, { status: 403 });
+    }
+
     const body = await request.json();
-    const { nome, descricao, dataInicio, dataFim, estado, imagemBase64, imageUrl } = body;
+    const { estado } = body;
 
-    let finalImageUrl = imageUrl || null;
-    if (imagemBase64 && imagemBase64.startsWith('data:image/')) {
-      const { saveBase64Image } = await import('@/lib/storage');
-      finalImageUrl = await saveBase64Image(imagemBase64);
+    if (!estado || !['rascunho', 'ativo', 'pausado', 'finalizado', 'cancelado'].includes(estado)) {
+      return NextResponse.json({ error: 'Estado inválido' }, { status: 400 });
     }
 
-    const evento = await db.evento.update({
+    const updated = await prisma.evento.update({
       where: { id },
-      data: {
-        titulo: nome,
-        descricao,
-        dataInicio: dataInicio ? new Date(dataInicio) : undefined,
-        dataFim: dataFim ? new Date(dataFim) : undefined,
-        estado,
-        imageUrl: finalImageUrl,
-        imagemBase64: null,
-      }
+      data: { estado }
     });
 
-    return NextResponse.json(evento);
+    try {
+      await logAudit(
+        user.id,
+        'update',
+        'evento',
+        id,
+        { campo: 'estado', old: evento.estado, new: estado },
+        request.headers.get('x-forwarded-for') || 'unknown',
+        request.headers.get('user-agent') || 'unknown'
+      );
+    } catch {}
+
+    return NextResponse.json({ success: true, data: updated });
   } catch (error) {
     console.error('Erro ao atualizar evento:', error);
-    return NextResponse.json(
-      { error: 'Erro ao atualizar evento' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
   }
 }
 
-export async function DELETE(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PUT(request: NextRequest, context: RouteContext) {
   try {
-    const user = await getUserFromRequest(request);
+    const { id } = await context.params;
+    const user = await getFullUserFromRequest(request);
 
-    if (!user || !['super_admin', 'aldeia_admin'].includes(user.role)) {
+    if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+    const denied = await requirePermission(user.id, 'MANAGE_ALDEIA');
+    if (denied) return denied;
+
+    const evento = await prisma.evento.findUnique({ where: { id } });
+    if (!evento) {
+      return NextResponse.json({ error: 'Evento não encontrado' }, { status: 404 });
+    }
+
+    if (user.role === 'aldeia_admin' && user.aldeiaId !== evento.aldeiaId) {
+      return NextResponse.json({ error: 'Não autorizado' }, { status: 403 });
+    }
+
+    const body = await request.json();
+
+    const validation = updateEventoSchema.safeParse(body);
+
+    if (!validation.success) {
+      return NextResponse.json({ error: 'Dados inválidos', details: validation.error.errors }, { status: 400 });
+    }
+
+    const data = validation.data;
+
+    let imagemUrl = undefined;
+    if (data.imagemBase64) {
+      const saved = await saveImage(data.imagemBase64, 'eventos');
+      imagemUrl = saved.url;
+    }
+
+    const updateData: Record<string, unknown> = { ...data };
+    delete updateData.imagemBase64;
+    delete updateData.jogosSelecionados;
+    delete updateData.isRecurring;
+    delete updateData.recurrenceFrequency;
+    delete updateData.recurrenceDayOfWeek;
+    delete updateData.recurrenceTime;
+
+
+    if (imagemUrl) updateData.imagemUrl = imagemUrl;
+    if (data.dataInicio) {
+      const d = new Date(data.dataInicio);
+      if (isNaN(d.getTime())) {
+        return NextResponse.json({ error: 'Data de início inválida' }, { status: 400 });
+      }
+      updateData.dataInicio = d;
+    }
+    if (data.dataFim) {
+      const d = new Date(data.dataFim);
+      if (isNaN(d.getTime())) {
+        return NextResponse.json({ error: 'Data de fim inválida' }, { status: 400 });
+      }
+      updateData.dataFim = d;
+    }
+
+    // Processamento de recorrência robusto
+    if (data.isRecurring !== undefined) {
+      updateData.isTemplate = data.isRecurring;
+
+      if (data.isRecurring && data.recurrenceFrequency && data.recurrenceDayOfWeek !== undefined && data.recurrenceTime) {
+        try {
+          const proximaData = calculateNextRecurrenceDate(
+            data.recurrenceFrequency,
+            data.recurrenceDayOfWeek,
+            data.recurrenceTime
+          );
+          updateData.proximaData = proximaData;
+          updateData.frequenciaRecorrencia = data.recurrenceFrequency;
+          updateData.diaSemanaRecorrencia = data.recurrenceDayOfWeek;
+        } catch (error) {
+          console.error('❌ Erro ao calcular recorrência:', error);
+          return NextResponse.json({ error: 'Erro ao calcular próxima recorrência' }, { status: 400 });
+        }
+      } else if (!data.isRecurring) {
+        updateData.frequenciaRecorrencia = null;
+        updateData.diaSemanaRecorrencia = null;
+        updateData.proximaData = null;
+        updateData.maxOcorrencias = null;
+        updateData.ocorrenciasCriadas = 0;
+      }
+    }
+
+    const updated = await prisma.evento.update({
+      where: { id },
+      data: updateData as Prisma.EventoUpdateInput,
+    });
+
+    // Audit log for event update
+    try {
+      await logAudit(
+        user.id,
+        'update',
+        'evento',
+        id,
+        {
+          oldValues: { nome: evento.nome, estado: evento.estado, dataInicio: evento.dataInicio, dataFim: evento.dataFim },
+          newValues: { nome: updated.nome, estado: updated.estado, dataInicio: updated.dataInicio, dataFim: updated.dataFim }
+        },
+        request.headers.get('x-forwarded-for') || 'unknown',
+        request.headers.get('user-agent') || 'unknown'
+      );
+    } catch (auditError) {
+      console.error('❌ Erro no audit log:', auditError);
+      // Não falhar por causa do audit log
+    }
+
+    return NextResponse.json({ success: true, data: updated });
+  } catch (error) {
+    console.error('Erro ao atualizar evento:', error);
+    return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest, context: RouteContext) {
+  try {
+    const { id } = await context.params;
+    const user = await getFullUserFromRequest(request);
+    
+    if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+    const denied = await requirePermission(user.id, 'MANAGE_ALDEIA');
+    if (denied) return denied;
+
+    const evento = await prisma.evento.findUnique({ where: { id } });
+    if (!evento) return NextResponse.json({ error: 'Evento não encontrado' }, { status: 404 });
+
+    if (user.role === 'aldeia_admin' && user.aldeiaId !== evento.aldeiaId) {
+      return NextResponse.json({ error: 'Não autorizado' }, { status: 403 });
+    }
+
+    // Hard-delete só sem jogos com participações; caso contrário, usar pedido de eliminação (soft-delete)
+    const jogosComParticipacoes = await prisma.jogo.count({
+      where: { eventoId: id, participacoes: { some: {} } },
+    });
+    if (jogosComParticipacoes > 0) {
       return NextResponse.json(
-        { error: 'Não autorizado' },
-        { status: 403 }
+        { error: 'Este evento tem jogos com participações. Use o pedido de eliminação (soft-delete) para o arquivar, ou o super administrador pode eliminar diretamente.' },
+        { status: 400 }
       );
     }
 
-    const { id } = await params;
+     await prisma.evento.delete({ where: { id } });
 
-    await db.evento.delete({
-      where: { id }
-    });
+     // Audit log
+     await logAudit(
+       user.id,
+       'delete',
+       'evento',
+       id,
+       { nome: evento.nome, aldeiaId: evento.aldeiaId, estado: evento.estado },
+       request.headers.get('x-forwarded-for') || 'unknown',
+       request.headers.get('user-agent') || 'unknown'
+     );
 
-    return NextResponse.json({ success: true });
+     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Erro ao eliminar evento:', error);
-    return NextResponse.json(
-      { error: 'Erro ao eliminar evento' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Erro interno' }, { status: 500 });
   }
 }

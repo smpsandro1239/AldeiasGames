@@ -1,60 +1,66 @@
-# Aldeias Games - Configuracao Caddy para Producao
-# Substitui {SEU_DOMINIO} pelo dominio real, ex: aldeias.games
+# Caddyfile para Aldeias Games
+# Configuração de produção com HTTPS automático
 
-{$DOMAIN:localhost} {
-    # Reverse proxy para a aplicacao Next.js
+{
+    auto_https off
+}
+
+:80 {
+    # Redirecionar para HTTPS em produção
+    # (descomentar quando tiver domínio configurado)
+    # redir https://{host}{uri}
+    
+    # Reverse proxy para a app Next.js
     reverse_proxy app:3000 {
+        # Health checks
+        health_uri /api/health
+        health_interval 30s
+        health_timeout 10s
+        
+        # Headers
         header_up Host {host}
-        header_up X-Forwarded-For {remote_host}
+        header_up X-Real-IP {remote}
+        header_up X-Forwarded-For {remote}
         header_up X-Forwarded-Proto {scheme}
-        header_up X-Real-IP {remote_host}
     }
-
-    # Headers de seguranca
-    header {
-        X-Content-Type-Options nosniff
-        X-Frame-Options DENY
-        Referrer-Policy strict-origin-when-cross-origin
-        -Server
-    }
-
-    # Compressao
+    
+    # Compressão
     encode gzip zstd
-
-    # Cache para assets estaticos
-    @static {
-        path /uploads/* /_next/static/* /logo.svg /robots.txt
+    
+    # Headers de segurança
+    header {
+        # HSTS (descomentar com HTTPS)
+        # Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        
+        # Prevenir clickjacking
+        X-Frame-Options "DENY"
+        
+        # Prevenir MIME sniffing
+        X-Content-Type-Options "nosniff"
+        
+        # XSS Protection
+        X-XSS-Protection "1; mode=block"
+        
+        # Referrer Policy
+        Referrer-Policy "strict-origin-when-cross-origin"
+        
+        # Content Security Policy
+        Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self' https://api.stripe.com https://api.mbway.pt;"
     }
-    header @static Cache-Control "public, max-age=31536000, immutable"
-
-    # Logs
+    
+    # Logging
     log {
-        output file /var/log/caddy/access.log
-        format json
-    }
-}
-
-# Desenvolvimento local - porta 81
-:81 {
-    @transform_port_query {
-        query XTransformPort=*
-    }
-
-    handle @transform_port_query {
-        reverse_proxy localhost:{query.XTransformPort} {
-            header_up Host {host}
-            header_up X-Forwarded-For {remote_host}
-            header_up X-Forwarded-Proto {scheme}
-            header_up X-Real-IP {remote_host}
-        }
-    }
-
-    handle {
-        reverse_proxy localhost:3000 {
-            header_up Host {host}
-            header_up X-Forwarded-For {remote_host}
-            header_up X-Forwarded-Proto {scheme}
-            header_up X-Real-IP {remote_host}
+        output file /var/log/caddy/access.log {
+            roll_size 10MB
+            roll_keep 5
+            roll_keep_days 30
         }
     }
 }
+
+# Configuração HTTPS (quando tiver domínio)
+# seu-dominio.pt {
+#     tls seu-email@exemplo.pt
+#     reverse_proxy app:3000
+#     encode gzip zstd
+# }

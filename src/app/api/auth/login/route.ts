@@ -1,63 +1,373 @@
-import { NextResponse } from 'next/server';
-import { loginUser, createToken } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { NextRequest, NextResponse } from 'next/server';
 import { loginSchema } from '@/lib/validations';
-import { ZodError } from 'zod';
+import {
+  verifyPassword,
+  generateToken,
+  updateLastLogin,
+  logAccess,
+  setAuthCookie,
+  generateRefreshToken,
+  setRefreshTokenCookie,
+} from '@/lib/auth';
+import { prisma } from '@/lib/db';
+import { checkRateLimit, rateLimitConfigs, createRateLimitResponse } from '@/lib/rate-limit';
+import { getClientIdentifier } from '@/lib/rate-limit';
+import { logger } from '@/lib/logger';
+import { verifyMFAOTP } from '@/lib/mfa';
 
-export async function POST(request: Request) {
+// Account lockout: bloquear após 5 falhas consecutivas
+const MAX_FAILED_ATTEMPTS = 5;
+const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutos
+
+// Demo users: BLOCKED unconditionally in production regardless of env vars
+const DEMO_USERS_ALLOWED = process.env.ENABLE_DEMO_USERS === 'true' && process.env.NODE_ENV !== 'production';
+
+type DemoUser = {
+  id: string;
+  email: string;
+  nome: string;
+  role: 'super_admin' | 'aldeia_admin' | 'vendedor' | 'user';
+  aldeiaId: string | null;
+  aldeia: null;
+  emailVerificado: boolean;
+  notificacoesEmail: boolean;
+  // Hash bcrypt de 'AldeiasDemo2024!' (cost 10)
+  passwordHash: string;
+};
+
+const demoUsers: Record<string, DemoUser> | null = DEMO_USERS_ALLOWED ? {
+  'admin@aldeias.pt': {
+    id: 'user-super-admin',
+    email: 'admin@aldeias.pt',
+    nome: 'Super Admin',
+    role: 'super_admin',
+    aldeiaId: null,
+    aldeia: null,
+    emailVerificado: true,
+    notificacoesEmail: true,
+    passwordHash: '$2a$10$kIxKQbO6VhVhGvLzK3b4kOz9xK5aHJ7Z5yN8rT1wE2mP4vC6dB3G6',
+  },
+  'aldeia@gmail.com': {
+    id: 'user-aldeia-admin',
+    email: 'aldeia@gmail.com',
+    nome: 'Aldeia Admin',
+    role: 'aldeia_admin',
+    aldeiaId: 'aldeia-vale-azenha',
+    aldeia: null,
+    emailVerificado: true,
+    notificacoesEmail: true,
+    passwordHash: '$2a$10$kIxKQbO6VhVhGvLzK3b4kOz9xK5aHJ7Z5yN8rT1wE2mP4vC6dB3G6',
+  },
+  'vendedor@gmail.com': {
+    id: 'user-vendedor',
+    email: 'vendedor@gmail.com',
+    nome: 'Vendedor',
+    role: 'vendedor',
+    aldeiaId: 'aldeia-vale-azenha',
+    aldeia: null,
+    emailVerificado: true,
+    notificacoesEmail: true,
+    passwordHash: '$2a$10$kIxKQbO6VhVhGvLzK3b4kOz9xK5aHJ7Z5yN8rT1wE2mP4vC6dB3G6',
+  },
+  'smpsandro1239@gmail.com': {
+    id: 'user-jogador',
+    email: 'smpsandro1239@gmail.com',
+    nome: 'Jogador',
+    role: 'user',
+    aldeiaId: null,
+    aldeia: null,
+    emailVerificado: true,
+    notificacoesEmail: true,
+    passwordHash: '$2a$10$kIxKQbO6VhVhGvLzK3b4kOz9xK5aHJ7Z5yN8rT1wE2mP4vC6dB3G6',
+  },
+} : null;
+
+async function getDemoUser(email: string, password: string): Promise<DemoUser | null> {
+  if (!demoUsers) return null;
+  const normalizedEmail = email.toLowerCase();
+  const demoUser = demoUsers[normalizedEmail];
+
+  if (!demoUser) return null;
+
+  const passwordValid = await verifyPassword(password, demoUser.passwordHash);
+  if (!passwordValid) return null;
+
+  return demoUser;
+}
+
+export async function POST(request: NextRequest) {
   try {
+    // Rate limiting
+    const clientId = getClientIdentifier(request);
+    const rateLimit = await checkRateLimit(clientId, rateLimitConfigs.login);
+
+    if (!rateLimit.allowed) {
+      return createRateLimitResponse(rateLimit.resetTime);
+    }
+
+    // Parse e validação do body
     const body = await request.json();
+    const validation = loginSchema.safeParse(body);
 
-    // Validar com Zod
-    const validatedData = loginSchema.parse(body);
-    const { email, password } = validatedData;
+    if (!validation.success) {
+      await logAccess(
+        body.email || 'unknown',
+        false,
+        clientId,
+        request.headers.get('user-agent') || 'unknown',
+        undefined,
+        'Dados de login inválidos'
+      );
 
-    const user = await loginUser(email, password);
-    
-    if (!user) {
       return NextResponse.json(
-        { error: 'Credenciais inválidas' },
+        { error: 'Dados inválidos', details: validation.error.errors },
+        { status: 400 }
+      );
+    }
+
+    const { email, password, totpCode } = validation.data;
+
+    const demoUser = DEMO_USERS_ALLOWED
+      ? await getDemoUser(email, password)
+      : null;
+
+    if (demoUser) {
+      const token = await generateToken({
+        userId: demoUser.id,
+        email: demoUser.email,
+        role: demoUser.role,
+        aldeiaId: demoUser.aldeiaId || undefined,
+      });
+
+      const response = NextResponse.json({
+        success: true,
+        message: 'Login bem-sucedido',
+        user: {
+          id: demoUser.id,
+          email: demoUser.email,
+          nome: demoUser.nome,
+          telefone: null,
+          role: demoUser.role,
+          aldeiaId: demoUser.aldeiaId,
+          aldeia: demoUser.aldeia,
+          notificacoesEmail: demoUser.notificacoesEmail,
+        },
+        precisaAldeia: demoUser.role !== 'super_admin' && !demoUser.aldeiaId,
+        token,
+      });
+
+      setAuthCookie(response, token);
+      const refreshToken = await generateRefreshToken(demoUser.id);
+      setRefreshTokenCookie(response, refreshToken);
+      return response;
+    }
+
+    // Buscar utilizador
+    const user = await prisma.user.findUnique({
+      where: { email: email.toLowerCase() },
+      include: {
+        aldeia: true,
+      },
+    });
+
+    if (!user) {
+      await logAccess(
+        email,
+        false,
+        clientId,
+        request.headers.get('user-agent') || 'unknown',
+        undefined,
+        'Utilizador não encontrado'
+      );
+
+      // Mensagem genérica para não revelar se o email existe
+      return NextResponse.json(
+        { error: 'Email ou password incorretos' },
         { status: 401 }
       );
     }
 
-    // Atualizar último login
-    try {
-      await db.user.update({
-        where: { id: user.id },
-        data: { ultimoLogin: new Date() }
-      });
-    } catch (e) {
-      // Ignorar erro
+    // ACCOUNT LOCKOUT: Verificar se a conta está bloqueada
+    const failedAttempts = user.falhasLogin || 0;
+    const lastFailedLogin = user.ultimaFalhaLogin;
+
+    if (failedAttempts >= MAX_FAILED_ATTEMPTS && lastFailedLogin) {
+      const timeSinceLastFail = Date.now() - lastFailedLogin.getTime();
+      if (timeSinceLastFail < LOCKOUT_DURATION_MS) {
+        const remainingMs = LOCKOUT_DURATION_MS - timeSinceLastFail;
+        const remainingMin = Math.ceil(remainingMs / 60000);
+
+        logger.warn('Account locked due to too many failed attempts', {
+          module: 'auth',
+          userId: user.id,
+          email: user.email,
+          failedAttempts,
+          lockoutRemaining: remainingMin,
+        });
+
+        return NextResponse.json(
+          { 
+            error: `Conta bloqueada. Tente novamente em ${remainingMin} minuto${remainingMin > 1 ? 's' : ''}.`,
+            lockedUntil: new Date(lastFailedLogin.getTime() + LOCKOUT_DURATION_MS).toISOString(),
+          },
+          { status: 429 }
+        );
+      } else {
+        // Lockout expired — reset counter
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { falhasLogin: 0, ultimaFalhaLogin: null },
+        });
+      }
     }
 
-    const token = await createToken({
-      id: user.id,
+    // Verificar password
+    const passwordValid = await verifyPassword(password, user.password);
+
+    if (!passwordValid) {
+      // Incrementar falhas de login
+      const newFailCount = failedAttempts + 1;
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { 
+          falhasLogin: newFailCount, 
+          ultimaFalhaLogin: new Date(),
+        },
+      });
+
+      await logAccess(
+        email,
+        false,
+        clientId,
+        request.headers.get('user-agent') || 'unknown',
+        user.id,
+        `Password incorreta (tentativa ${newFailCount}/${MAX_FAILED_ATTEMPTS})`
+      );
+
+      logger.warn('Failed login attempt', {
+        module: 'auth',
+        userId: user.id,
+        email: user.email,
+        attempt: newFailCount,
+        maxAttempts: MAX_FAILED_ATTEMPTS,
+      });
+
+      const remaining = MAX_FAILED_ATTEMPTS - newFailCount;
+      const errorMsg = remaining > 0
+        ? `Email ou password incorretos. ${remaining} tentativa${remaining > 1 ? 's' : ''} restante${remaining > 1 ? 's' : ''}.`
+        : 'Conta bloqueada. Contacte o suporte.';
+
+      return NextResponse.json(
+        { error: errorMsg },
+        { status: 401 }
+      );
+    }
+
+    // Login bem-sucedido — reset falhas
+    if (failedAttempts > 0) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { falhasLogin: 0, ultimaFalhaLogin: null },
+      });
+    }
+
+    // Verificar se email está verificado
+    if (!user.emailVerificado) {
+      return NextResponse.json(
+        { error: 'Email não verificado. Por favor verifique o seu email antes de fazer login.' },
+        { status: 403 }
+      );
+    }
+
+    // Verificar 2FA para roles admin
+    const requiresTwoFactor = user.role === 'super_admin' || user.role === 'aldeia_admin';
+    
+    if (requiresTwoFactor) {
+      const tfa = await prisma.twoFactorAuth.findUnique({
+        where: { userId: user.id },
+      });
+
+      if (tfa?.enabled) {
+        if (!totpCode) {
+          return NextResponse.json(
+            { requiresTwoFactor: true, message: 'Código 2FA necessário' },
+            { status: 200 }
+          );
+        }
+
+        const isValidCode = verifyMFAOTP(totpCode, tfa.secret);
+
+        if (!isValidCode) {
+          await logAccess(
+            email,
+            false,
+            clientId,
+            request.headers.get('user-agent') || 'unknown',
+            user.id,
+            'Código 2FA inválido'
+          );
+
+          return NextResponse.json(
+            { error: 'Código 2FA inválido' },
+            { status: 401 }
+          );
+        }
+      }
+    }
+
+    // Gerar token JWT
+    const token = await generateToken({
+      userId: user.id,
       email: user.email,
-      nome: user.nome,
       role: user.role,
       aldeiaId: user.aldeiaId || undefined,
     });
 
-    return NextResponse.json({
+    // Atualizar último login
+    await updateLastLogin(user.id);
+
+    // Registar log de acesso bem-sucedido
+    await logAccess(
+      email,
+      true,
+      clientId,
+      request.headers.get('user-agent') || 'unknown',
+      user.id
+    );
+
+    logger.info('Login successful', {
+      module: 'auth',
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+    });
+
+    // Criar resposta com cookie httpOnly
+    const response = NextResponse.json({
+      success: true,
+      message: 'Login bem-sucedido',
       user: {
         id: user.id,
-        nome: user.nome,
         email: user.email,
+        nome: user.nome,
+        telefone: user.telefone,
         role: user.role,
-        aldeiaId: user.aldeiaId,
+        aldeiaId: user.aldeiaId as string | null,
         aldeia: user.aldeia,
+        notificacoesEmail: user.notificacoesEmail,
       },
+      precisaAldeia: user.role !== 'super_admin' && !user.aldeiaId,
       token,
     });
+
+    // Definir cookie httpOnly seguro
+    setAuthCookie(response, token);
+    const refreshToken = await generateRefreshToken(user.id);
+    setRefreshTokenCookie(response, refreshToken);
+
+    return response;
   } catch (error) {
-    if (error instanceof ZodError && error.issues && error.issues.length > 0) {
-      return NextResponse.json(
-        { error: error.issues[0].message },
-        { status: 400 }
-      );
-    }
-    console.error('Erro ao fazer login:', error);
+    logger.error('Erro no login', { module: 'auth', error });
     return NextResponse.json(
       { error: 'Erro interno do servidor' },
       { status: 500 }

@@ -1,45 +1,63 @@
-FROM oven/bun:1 AS base
+# ============================================
+# Build Stage
+# ============================================
+FROM oven/bun:1 AS builder
+
 WORKDIR /app
 
-# Instalar dependencias
-FROM base AS deps
-COPY package.json bun.lock ./
+# Copiar ficheiros de configuração
+COPY package.json bun.lock* ./
+COPY prisma ./prisma/
+
+# Instalar dependências
 RUN bun install --frozen-lockfile
 
-# Build da aplicacao
-FROM base AS builder
-COPY --from=deps /app/node_modules ./node_modules
+# Copiar código fonte
 COPY . .
-ENV NODE_ENV=production
-RUN bunx prisma generate && bun run build
 
-# Imagem final de producao (minima)
-FROM base AS runner
+# Gerar Prisma Client
+RUN bunx prisma generate
+
+# Build da aplicação
+ENV NEXT_TELEMETRY_DISABLED=1
+RUN bun run build
+
+# ============================================
+# Production Stage
+# ============================================
+FROM oven/bun:1-slim AS runner
+
 WORKDIR /app
-ENV NODE_ENV=production
 
-# Copiar ficheiros necessarios
+# Criar utilizador não-root
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
+# Copiar ficheiros necessários
+COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/public ./public
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
-# Criar diretorios necessarios
-RUN mkdir -p /app/prisma/db /app/public/uploads
+# Criar pasta uploads
+RUN mkdir -p /app/public/uploads && chown -R nextjs:nodejs /app/public/uploads
 
-# Utilizador nao root para seguranca
-RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
-RUN chown -R nextjs:nodejs /app
+# Mudar para utilizador não-root
 USER nextjs
 
+# Expor porta
 EXPOSE 3000
+
+# Healthcheck
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD bun -e "fetch('http://localhost:3000/api/health').then(r => r.ok ? process.exit(0) : process.exit(1))"
+
+# Variáveis de ambiente
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-# Verificacao de saude
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD curl -f http://localhost:3000/api || exit 1
-
-CMD ["node", "server.js"]
+# Comando de inicialização
+CMD ["bun", "server.js"]

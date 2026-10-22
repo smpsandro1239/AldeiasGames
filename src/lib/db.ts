@@ -1,29 +1,17 @@
-import { PrismaClient } from '@prisma/client'
+// @ts-ignore
+import { PrismaClient } from '@prisma/client';
 
 const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined
-  db: PrismaClient | undefined
-}
+  prisma: PrismaClient | undefined;
+};
 
-export const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
-  })
+export const prisma = globalForPrisma.prisma ?? new PrismaClient({
+  log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+  errorFormat: 'minimal',
+});
 
-// Alias for backward compatibility
-export const db = prisma
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = prisma
-  globalForPrisma.db = prisma
-}
+// Middleware for error handling removed - $use deprecated in Prisma v5
 
-export async function alterarParticipacao(id: string, data: any) {
-  return await prisma.participacao.update({
-    where: { id },
-    data: {
-      dadosParticipacao: JSON.stringify(data),
-    },
-  });
-}
+export default prisma;

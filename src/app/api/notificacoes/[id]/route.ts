@@ -1,22 +1,21 @@
-import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { getUserFromRequest } from '@/lib/auth';
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/db';
+import { getFullUserFromRequest } from '@/lib/auth';
 
-// PATCH - Marcar notificação individual como lida
-export async function PATCH(
-  request: Request,
+export async function PUT(
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = await getUserFromRequest(request);
-    const { id } = await params;
-    
+    const user = await getFullUserFromRequest(request);
     if (!user) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
-    const notificacao = await db.notificacao.findUnique({
-      where: { id }
+    const { id } = await params;
+
+    const notificacao = await prisma.notificacao.findUnique({
+      where: { id },
     });
 
     if (!notificacao) {
@@ -27,33 +26,32 @@ export async function PATCH(
       return NextResponse.json({ error: 'Não autorizado' }, { status: 403 });
     }
 
-    const updated = await db.notificacao.update({
+    const updated = await prisma.notificacao.update({
       where: { id },
-      data: { lida: true }
+      data: { lida: true },
     });
 
-    return NextResponse.json(updated);
+    return NextResponse.json({ success: true, data: updated });
   } catch (error) {
     console.error('Erro ao atualizar notificação:', error);
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 });
   }
 }
 
-// DELETE - Apagar notificação
 export async function DELETE(
-  request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = await getUserFromRequest(request);
-    const { id } = await params;
-    
+    const user = await getFullUserFromRequest(request);
     if (!user) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
-    const notificacao = await db.notificacao.findUnique({
-      where: { id }
+    const { id } = await params;
+
+    const notificacao = await prisma.notificacao.findUnique({
+      where: { id },
     });
 
     if (!notificacao) {
@@ -64,9 +62,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Não autorizado' }, { status: 403 });
     }
 
-    await db.notificacao.delete({
-      where: { id }
-    });
+    await prisma.notificacao.delete({ where: { id } });
 
     return NextResponse.json({ success: true });
   } catch (error) {

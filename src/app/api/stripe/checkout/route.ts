@@ -1,49 +1,47 @@
-// @ts-nocheck
-import { NextResponse } from 'next/server';
-import { stripe } from '@/lib/stripe';
-import { getUserFromRequest } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { NextRequest, NextResponse } from 'next/server';
+import { createCheckoutSession } from '@/lib/stripe';
+import { getFullUserFromRequest } from '@/lib/auth';
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const user = await getUserFromRequest(request);
-    if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+    const user = await getFullUserFromRequest(request);
+
+    if (!user) {
+      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+    }
 
     const body = await request.json();
-    const { jogoId, quantity = 1 } = body;
+    const { valor, descricao, jogoId, eventoId } = body;
 
-    const jogo = await db.jogo.findUnique({
-      where: { id: jogoId },
-      include: { evento: true }
-    });
+    if (!valor || valor <= 0) {
+      return NextResponse.json({ error: 'Valor inválido' }, { status: 400 });
+    }
 
-    if (!jogo) return NextResponse.json({ error: 'Jogo não encontrado' }, { status: 404 });
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      line_items: [{
-        price_data: {
-          currency: 'eur',
-          product_data: {
-            name: `Participação: ${jogo.tipo}`,
-            description: `Evento: ${jogo.evento.nome}`,
-          },
-          unit_amount: Math.round(jogo.precoParticipacao * 100),
-        },
-        quantity,
-      }],
-      mode: 'payment',
-      success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/?success=true&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/?canceled=true`,
-      customer_email: user.email,
+    const session = await createCheckoutSession({
+      valor,
+      descricao: descricao || 'Compra Aldeias Games',
       metadata: {
         userId: user.id,
-        jogoId: jogo.id,
+        jogoId: jogoId || '',
+        eventoId: eventoId || '',
+        tipo: 'participacao',
       },
+      successUrl: `${baseUrl}/?payment=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancelUrl: `${baseUrl}/?payment=cancelled`,
     });
 
-    return NextResponse.json({ checkoutUrl: session.url, sessionId: session.id });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({
+      success: true,
+      sessionId: session.id,
+      url: session.url,
+    });
+  } catch (error) {
+    console.error('Erro ao criar sessão Stripe:', error);
+    return NextResponse.json(
+      { error: 'Erro ao processar pagamento' },
+      { status: 500 }
+    );
   }
 }

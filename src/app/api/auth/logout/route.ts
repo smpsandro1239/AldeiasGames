@@ -1,26 +1,20 @@
-/**
- * Logout API Route
- * Clears auth cookies and returns to home
- */
+import { NextRequest, NextResponse } from 'next/server';
+import { clearAuthCookie, clearRefreshTokenCookie, revokeAllRefreshTokens, getFullUserFromRequest } from '@/lib/auth';
 
-import { NextResponse } from 'next/server';
+export async function POST(request: NextRequest) {
+  // Revoke all refresh tokens for the user
+  const user = await getFullUserFromRequest(request);
+  if (user) {
+    await revokeAllRefreshTokens(user.id);
+  }
 
-export async function POST() {
-  const response = NextResponse.json({ success: true });
-  
-  // Clear auth cookies (auth-token é o cookie de sessão real definido no login/dev-login)
-  response.cookies.set('auth-token', '', { 
-    expires: new Date(0),
-    path: '/'
+  const response = NextResponse.json({
+    success: true,
+    message: 'Logout efetuado com sucesso',
   });
-  response.cookies.set('user-role', '', { 
-    expires: new Date(0),
-    path: '/'
-  });
-  
+
+  clearAuthCookie(response);
+  clearRefreshTokenCookie(response);
+
   return response;
-}
-
-export async function GET() {
-  return POST();
 }

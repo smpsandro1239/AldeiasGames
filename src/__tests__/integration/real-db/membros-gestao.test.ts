@@ -1,0 +1,266 @@
+// @vitest-environment node
+import { describe, beforeAll, afterAll, it, expect, vi } from "vitest";
+import {
+  setupTestDatabase,
+  teardownTestDatabase,
+  getPrisma,
+} from "../../helpers/test-db";
+
+const mocks = vi.hoisted(() => ({ user: null as any }));
+
+vi.mock("@/lib/auth", () => ({
+  getFullUserFromRequest: async () => mocks.user,
+  getUserFromRequest: async () =>
+    mocks.user
+      ? { userId: mocks.user.id, role: mocks.user.role, aldeiaId: mocks.user.aldeiaId ?? null }
+      : null,
+  hashPassword: async (p: string) => `hashed:${p}`,
+  verifyToken: async () =>
+    mocks.user
+      ? { userId: mocks.user.id, role: mocks.user.role, aldeiaId: mocks.user.aldeiaId ?? null }
+      : null,
+}));
+
+describe("Real DB: Gestão de membros da aldeia", () => {
+  let prisma: any;
+  let registarPOST: any;
+  let aldeia: any;
+  let roles: Record<string, string> = {}; // name -> id
+
+  const req = (body: unknown, _params?: Record<string, string>) =>
+    ({
+      json: async () => body,
+      headers: new Headers(),
+      url: "http://test",
+    }) as any;
+
+  beforeAll(async () => {
+    setupTestDatabase();
+    prisma = await getPrisma();
+    const route = await import("@/app/api/aldeias/[id]/membros/registar/route");
+    registarPOST = route.POST;
+
+    aldeia = await prisma.aldeia.create({
+      data: { nome: "Aldeia Membros", slug: "aldeia-membros", tipoOrganizacao: "aldeia", email: "m@b.pt" },
+    });
+
+    // Utilizador real do AuditLog (FK userId) — id coincide com o mock dos testes
+    await prisma.user.create({
+      data: { id: "super1", nome: "Super", email: "super@m.pt", password: "hashed:x", role: "super_admin", saldo: 0 },
+    });
+    for (const name of ["ALDEIA_ADMIN", "MODERADOR", "COLABORADOR", "MEMBRO"]) {
+      const r = await prisma.role.create({ data: { name, description: name } });
+      roles[name] = r.id;
+    }
+
+    // Fixtures para o teste de pesquisa global
+    await prisma.user.create({ data: { nome: "Alice Silva", email: "alice@teste.pt", password: "hashed:x", role: "user", saldo: 0 } });
+    await prisma.user.create({ data: { nome: "Bruno Costa", email: "bruno@teste.pt", password: "hashed:x", role: "vendedor", saldo: 0 } });
+    await prisma.user.create({ data: { nome: "Super Global", email: "super@teste.pt", password: "hashed:x", role: "super_admin", saldo: 0 } });
+    await prisma.user.create({ data: { nome: "Membro A", email: "membroa@teste.pt", password: "hashed:x", role: "user", saldo: 0 } });
+    // membro a da aldeia:
+    const membroA = await prisma.user.findUnique({ where: { email: "membroa@teste.pt" } });
+    await prisma.userAldeiaRole.create({ data: { userId: membroA.id, aldeiaId: aldeia.id, roleId: roles.MEMBRO } });
+  });
+
+  afterAll(async () => {
+    await teardownTestDatabase();
+  });
+
+  describe("POST /membros/registar", () => {
+    it("cria utilizador com password hashed + UserAldeiaRole + AuditLog", async () => {
+      mocks.user = { id: "super1", role: "super_admin", aldeiaId: null };
+      const res = await registarPOST(
+        req(
+          { nome: "Novo Membro", email: "novo@teste.pt", password: "SenhaMuito#Segura123", role: "COLABORADOR" },
+          { id: aldeia.id },
+        ),
+        { params: Promise.resolve({ id: aldeia.id }) },
+      );
+      expect(res.status).toBe(201);
+      const body = await res.json();
+      expect(body.user.nome).toBe("Novo Membro");
+      expect(body.user.email).toBe("novo@teste.pt");
+      expect(body.user.password).toBeUndefined();
+
+      const dbUser = await prisma.user.findUnique({ where: { email: "novo@teste.pt" } });
+      expect(dbUser.password).toBe("hashed:SenhaMuito#Segura123");
+      expect(dbUser.aldeiaId).toBe(aldeia.id);
+
+      const uar = await prisma.userAldeiaRole.findFirst({
+        where: { userId: dbUser.id, aldeiaId: aldeia.id },
+      });
+      expect(uar.roleId).toBe(roles.COLABORADOR);
+
+      const audit = await prisma.auditLog.findFirst({
+        where: { action: "CRIAR_MEMBRO_ALDEIA", resourceId: dbUser.id },
+      });
+      expect(audit).not.toBeNull();
+      expect(audit.metadata.addedRole).toBe("COLABORADOR");
+    });
+
+    it("devolve 409 com email já registado (sem duplicar)", async () => {
+      mocks.user = { id: "super1", role: "super_admin", aldeiaId: null };
+      await prisma.user.create({ data: { nome: "Existente", email: "exist@teste.pt", password: "hashed:x", role: "user", saldo: 0 } });
+      const res = await registarPOST(
+        req(
+          { nome: "Outro", email: "exist@teste.pt", password: "SenhaMuito#Segura123", role: "MEMBRO" },
+          { id: aldeia.id },
+        ),
+        { params: Promise.resolve({ id: aldeia.id }) },
+      );
+      expect(res.status).toBe(409);
+      const users = await prisma.user.count({ where: { email: "exist@teste.pt" } });
+      expect(users).toBe(1);
+    });
+
+    it("devolve 400 com password fraca (mesmas regras do registo)", async () => {
+      mocks.user = { id: "super1", role: "super_admin", aldeiaId: null };
+      const res = await registarPOST(
+        req(
+          { nome: "Fraco", email: "fraco@teste.pt", password: "123", role: "MEMBRO" },
+          { id: aldeia.id },
+        ),
+        { params: Promise.resolve({ id: aldeia.id }) },
+      );
+      expect(res.status).toBe(400);
+    });
+
+    it("devolve 403 para utilizador normal", async () => {
+      mocks.user = { id: "u1", role: "user", aldeiaId: null };
+      const res = await registarPOST(
+        req(
+          { nome: "Sem Perm", email: "semperm@teste.pt", password: "SenhaMuito#Segura123", role: "MEMBRO" },
+          { id: aldeia.id },
+        ),
+        { params: Promise.resolve({ id: aldeia.id }) },
+      );
+      expect(res.status).toBe(403);
+    });
+  });
+
+  describe("GET /membros/search", () => {
+    let searchGET: any;
+
+    beforeAll(async () => {
+      const route = await import("@/app/api/aldeias/[id]/membros/search/route");
+      searchGET = route.GET;
+    });
+
+    const reqGET = (q: string | null, params: Record<string, string>) => {
+      const url = new URL(`http://test/api/aldeias/${params.id}/membros/search`);
+      if (q !== null) url.searchParams.set("q", q);
+      return { url: url.toString(), headers: new Headers() } as any;
+    };
+
+    it("devolve utilizadores globais que não são membros, por nome", async () => {
+      mocks.user = { id: "super1", role: "super_admin", aldeiaId: null };
+      const res = await searchGET(reqGET("alice", { id: aldeia.id }), { params: Promise.resolve({ id: aldeia.id }) });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.users.length).toBe(1);
+      expect(body.users[0].email).toBe("alice@teste.pt");
+    });
+
+    it("procurar por email; não devolve já-membros nem super_admins", async () => {
+      mocks.user = { id: "super1", role: "super_admin", aldeiaId: null };
+      const res = await searchGET(reqGET("membroa", { id: aldeia.id }), { params: Promise.resolve({ id: aldeia.id }) });
+      const body = await res.json();
+      expect(body.users.some((u: any) => u.email === "membroa@teste.pt")).toBe(false);
+
+      const resSuper = await searchGET(reqGET("super@teste.pt", { id: aldeia.id }), { params: Promise.resolve({ id: aldeia.id }) });
+      const bodySuper = await resSuper.json();
+      expect(bodySuper.users.some((u: any) => u.email === "super@teste.pt")).toBe(false);
+    });
+
+    it("q com menos de 2 caracteres devolve 400", async () => {
+      mocks.user = { id: "super1", role: "super_admin", aldeiaId: null };
+      const res = await searchGET(reqGET("a", { id: aldeia.id }), { params: Promise.resolve({ id: aldeia.id }) });
+      expect(res.status).toBe(400);
+    });
+
+    it("devolve 403 para utilizador normal", async () => {
+      mocks.user = { id: "u1", role: "user", aldeiaId: null };
+      const res = await searchGET(reqGET("alice", { id: aldeia.id }), { params: Promise.resolve({ id: aldeia.id }) });
+      expect(res.status).toBe(403);
+    });
+  });
+
+  describe("PATCH /membros/:id", () => {
+    let patchMembro: any;
+
+    beforeAll(async () => {
+      const route = await import("@/app/api/aldeias/[id]/membros/[membroId]/route");
+      patchMembro = route.PATCH;
+    });
+
+    it("edita nome e email de um membro + AuditLog", async () => {
+      mocks.user = { id: "super1", role: "super_admin", aldeiaId: null };
+      const alice = await prisma.user.findUnique({ where: { email: "alice@teste.pt" } });
+      await prisma.userAldeiaRole.create({ data: { userId: alice.id, aldeiaId: aldeia.id, roleId: roles.MEMBRO } });
+
+      const res = await patchMembro(
+        req({ nome: "Alice M. Silva", email: "alice.silva@teste.pt" }),
+        { params: Promise.resolve({ id: aldeia.id, membroId: alice.id }) },
+      );
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.user.nome).toBe("Alice M. Silva");
+      expect(body.user.email).toBe("alice.silva@teste.pt");
+
+      const audit = await prisma.auditLog.findFirst({
+        where: { action: "EDITAR_MEMBRO_ALDEIA", aldeiaId: aldeia.id },
+      });
+      expect(audit).not.toBeNull();
+      expect(audit.metadata.alteracoes).toContain("nome");
+    });
+
+    it("email já usado por outro utilizador devolve 409", async () => {
+      mocks.user = { id: "super1", role: "super_admin", aldeiaId: null };
+      const alice = await prisma.user.findUnique({ where: { email: "alice.silva@teste.pt" } });
+      const res = await patchMembro(
+        req({ email: "bruno@teste.pt" }),
+        { params: Promise.resolve({ id: aldeia.id, membroId: alice.id }) },
+      );
+      expect(res.status).toBe(409);
+    });
+
+    it("utilizador que não é membro desta aldeia devolve 404", async () => {
+      mocks.user = { id: "super1", role: "super_admin", aldeiaId: null };
+      const bruno = await prisma.user.findUnique({ where: { email: "bruno@teste.pt" } });
+      const res = await patchMembro(
+        req({ nome: "Bruno X" }),
+        { params: Promise.resolve({ id: aldeia.id, membroId: bruno.id }) },
+      );
+      expect(res.status).toBe(404);
+    });
+
+    it("devolve 403 para utilizador normal", async () => {
+      mocks.user = { id: "u1", role: "user", aldeiaId: null };
+      const alice = await prisma.user.findUnique({ where: { email: "alice.silva@teste.pt" } });
+      const res = await patchMembro(
+        req({ nome: "X" }),
+        { params: Promise.resolve({ id: aldeia.id, membroId: alice.id }) },
+      );
+      expect(res.status).toBe(403);
+    });
+
+    it("editar o líder da aldeia devolve 400", async () => {
+      mocks.user = { id: "super1", role: "super_admin", aldeiaId: null };
+      const lider = await prisma.user.create({
+        data: { nome: "Lider Teste", email: "lider@teste.pt", password: "hashed:x", role: "user", saldo: 0 },
+      });
+      await prisma.aldeia.update({
+        where: { id: aldeia.id },
+        data: { admins: { connect: { id: lider.id } } },
+      });
+      await prisma.userAldeiaRole.create({ data: { userId: lider.id, aldeiaId: aldeia.id, roleId: roles.ALDEIA_ADMIN } });
+
+      const res = await patchMembro(
+        req({ nome: "Lider Editado" }),
+        { params: Promise.resolve({ id: aldeia.id, membroId: lider.id }) },
+      );
+      expect(res.status).toBe(400);
+    });
+  });
+});

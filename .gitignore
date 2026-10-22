@@ -1,40 +1,89 @@
-# Environment variables
-.env
-.env.local
-.env.*.local
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
 
-# Python
-__pycache__/
-*.pyc
-venv/
-.venv/
+# testing
+/coverage
 
-# System
+# next.js
+/.next/
+/out/
+build
+
+# misc
 .DS_Store
-Thumbs.db
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (don't commit secrets)
+.env*.local
+.env
+.env.development.local
+.env.test.local
+.env.production.local
+.env.vercel
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# prisma
+/prisma/*.db
+/prisma/*.db-journal
+
+# uploads/media
+/public/uploads/
+
+# agent / opencode
+.agent/
+.agents/
+.opencode/
+.claude/
+.continue/
+.kiro/
+.superpowers/
+.sixth/
 
 # IDE
-.vscode/
 .idea/
+.vscode/
 *.swp
 *.swo
 
-# Logs
-*.log
-npm-debug.log*
+# OS
+Thumbs.db
 
-# Token files
-*.token
-credentials/
-node_modules/
-.next/
-node_modules/
-.next/
-.vercel/
+# load tests
+load-test*.js
+loadtest*.js
 
-# Higiene do repositório
-cookies.txt
-*.db
-*.db-journal
+# temp / logs
+server.log
+server.err
+server_err.txt
+server_log.txt
+build.log
+nul
+
+# playwright
+/test-results/
+/playwright-report/
 prisma/prisma/
-tsconfig.tsbuildinfo
+
+.env*
+
+# Schema Postgres gerado no build (Vercel)
+prisma/schema.postgres.prisma
+
+# Logs e scripts manuais de teste (Windows)
+*.log
+Clear

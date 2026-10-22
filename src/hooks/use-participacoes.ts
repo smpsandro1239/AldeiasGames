@@ -1,105 +1,196 @@
-import { useState, useCallback } from 'react';
-import { toast } from 'sonner';
-import { User, Participacao, Jogo } from '@/types/project';
+"use client";
 
-export function useParticipacoes(user: User | null, onParticipacaoSuccess?: () => void) {
-  const [minhasParticipacoes, setMinhasParticipacoes] = useState<Participacao[]>([]);
+import { useState, useEffect, useCallback } from "react";
+import { toast } from "sonner";
+
+interface Participacao {
+  id: string;
+  dadosParticipacao: Record<string, unknown>;
+  valorPago: number;
+  metodoPagamento: string;
+  estadoPagamento: string;
+  referenciaPagamento?: string;
+  dataPagamento?: string;
+  seedRaspe?: string;
+  hashRaspe?: string;
+  resultadoRaspe?: string;
+  revelado: boolean;
+  dataRevelacao?: string;
+  ganhador: boolean;
+  premioEntregue: boolean;
+  jogo?: {
+    id: string;
+    nome: string;
+    tipo: string;
+    preco: number;
+    evento?: {
+      id: string;
+      nome: string;
+      aldeia?: {
+        id: string;
+        nome: string;
+      };
+    };
+  };
+  user?: {
+    id: string;
+    nome: string;
+    email: string;
+    telefone?: string;
+  };
+}
+
+interface CreateParticipacaoData {
+  jogoId: string;
+  dadosParticipacao: Record<string, unknown>;
+  quantidade: number;
+  metodoPagamento: "mbway" | "dinheiro" | "stripe" | "transferencia";
+  dadosCliente?: {
+    nome: string;
+    telefone: string;
+    email?: string;
+  };
+}
+
+export function useParticipacoes(token: string | null) {
+  const [participacoes, setParticipacoes] = useState<Participacao[]>([]);
   const [loading, setLoading] = useState(false);
-  const [participacaoLoading, setParticipacaoLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 20,
+    total: 0,
+    totalPages: 0,
+  });
 
-  const fetchMinhasParticipacoes = useCallback(async () => {
-    if (!user) return;
-    const token = localStorage.getItem('token');
+  const fetchParticipacoes = useCallback(async (params: { 
+    page?: number; 
+    limit?: number; 
+    jogoId?: string;
+    userId?: string;
+  } = {}) => {
     if (!token) return;
 
     setLoading(true);
+    setError(null);
+
     try {
-      const res = await fetch(`/api/participacoes?userId=${user.id}`, {
-        headers: { Authorization: `Bearer ${token}` }
+    const queryParams = new URLSearchParams();
+    if (params.page) queryParams.append("page", params.page.toString());
+    if (params.limit) queryParams.append("limit", params.limit.toString());
+    if (params.jogoId) queryParams.append("jogoId", params.jogoId);
+    if (params.userId) queryParams.append("userId", params.userId);
+
+      const response = await fetch(`/api/participacoes?${queryParams}`, {
+        headers: { Authorization: `Bearer ${token}` },
       });
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        setMinhasParticipacoes(data);
+
+      if (!response.ok) {
+        throw new Error("Erro ao carregar participações");
       }
-    } catch (error) {
-      console.error('Error fetching participations:', error);
+
+      const data = await response.json();
+      setParticipacoes(data.data);
+      setPagination(data.pagination);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Erro desconhecido";
+      setError(message);
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [token]);
 
-  const handleParticipar = useCallback(async (
-    jogo: Jogo,
-    dados: any,
-    metodo: string,
-    telefone: string,
-    adminParaCliente: boolean = false,
-    clienteInfo: any = {}
-  ) => {
-    setParticipacaoLoading(true);
-    const token = localStorage.getItem('token');
+  const createParticipacao = useCallback(async (data: CreateParticipacaoData) => {
+    if (!token) return { success: false, error: "Não autenticado" };
+
+    setLoading(true);
 
     try {
-      const res = await fetch('/api/participacoes', {
-        method: 'POST',
+      const response = await fetch("/api/participacoes", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          jogoId: jogo.id,
-          dadosParticipacao: dados,
-          valorPago: jogo.precoParticipacao,
-          metodoPagamento: metodo,
-          telefoneMbway: metodo === 'mbway' ? telefone : null,
-          adminParaCliente,
-          ...clienteInfo
-        }),
+        body: JSON.stringify(data),
       });
 
-      const data = await res.json();
+      const responseData = await response.json();
 
-      if (!res.ok) {
-        toast.error(data.error || 'Erro ao participar');
-        return false;
+      if (!response.ok) {
+        throw new Error(responseData.error || "Erro ao criar participação");
       }
 
-      toast.success(data.mensagem || 'Participação registada!');
-      if (onParticipacaoSuccess) onParticipacaoSuccess();
-      return true;
-    } catch (error) {
-      toast.error('Erro de ligação');
-      return false;
+      toast.success("Participação registada com sucesso!");
+      await fetchParticipacoes();
+      return { success: true, data: responseData.data, valorTotal: responseData.valorTotal };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Erro desconhecido";
+      toast.error(message);
+      return { success: false, error: message };
     } finally {
-      setParticipacaoLoading(false);
+      setLoading(false);
     }
-  }, [onParticipacaoSuccess]);
+  }, [token, fetchParticipacoes]);
 
-  const handleRevelarRaspadinha = useCallback(async (participacaoId: string) => {
-    const token = localStorage.getItem('token');
+  const revelarRaspadinha = useCallback(async (participacaoId: string) => {
+    if (!token) return { success: false, error: "Não autenticado" };
+
+    setLoading(true);
+
     try {
-      const res = await fetch(`/api/participacoes/${participacaoId}/revelar`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` }
+      const response = await fetch(`/api/participacoes/${participacaoId}/revelar`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
       });
-      const data = await res.json();
-      if (res.ok) {
-        return data.resultado;
+
+      const responseData = await response.json();
+
+      if (!response.ok) {
+        throw new Error(responseData.error || "Erro ao revelar raspadinha");
       }
-      toast.error(data.error || 'Erro ao revelar');
-    } catch (error) {
-      toast.error('Erro de ligação');
+
+      toast.success(responseData.data.ganhou ? "Parabéns! Ganhou!" : "Não foi desta vez!");
+      await fetchParticipacoes();
+      return { success: true, data: responseData.data };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Erro desconhecido";
+      toast.error(message);
+      return { success: false, error: message };
+    } finally {
+      setLoading(false);
     }
-    return null;
-  }, []);
+  }, [token, fetchParticipacoes]);
+
+  const verificarHash = useCallback(async (participacaoId: string) => {
+    if (!token) return { success: false, error: "Não autenticado" };
+
+    try {
+      const response = await fetch(`/api/participacoes/${participacaoId}/revelar`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      const responseData = await response.json();
+
+      if (!response.ok) {
+        throw new Error(responseData.error || "Erro ao verificar hash");
+      }
+
+      return { success: true, data: responseData.data };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Erro desconhecido";
+      return { success: false, error: message };
+    }
+  }, [token]);
 
   return {
-    minhasParticipacoes,
-    setMinhasParticipacoes,
+    participacoes,
     loading,
-    participacaoLoading,
-    fetchMinhasParticipacoes,
-    handleParticipar,
-    handleRevelarRaspadinha
+    error,
+    pagination,
+    fetchParticipacoes,
+    createParticipacao,
+    revelarRaspadinha,
+    verificarHash,
   };
 }

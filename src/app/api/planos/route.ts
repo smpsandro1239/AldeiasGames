@@ -1,51 +1,77 @@
-import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/db';
+import { getFullUserFromRequest } from '@/lib/auth';
+import { requirePermission } from '@/lib/rbac/checkPermission';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const planos = await db.plano.findMany({
-      orderBy: { precoMensal: 'asc' }
+    const url = new URL(request.url);
+    const aldeiaId = url.searchParams.get('aldeiaId');
+
+    const where = aldeiaId ? { aldeiaId } : {};
+
+    const planos = await prisma.plano.findMany({
+      orderBy: { nome: 'asc' },
     });
 
-    return NextResponse.json(planos);
+    let aldeiaPlano = null;
+    if (aldeiaId) {
+      aldeiaPlano = await prisma.aldeia.findUnique({
+        where: { id: aldeiaId },
+        select: {
+          planoId: true,
+          dataInicioPlano: true,
+          dataFimPlano: true,
+        },
+      });
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        planos,
+        planoAtual: aldeiaPlano,
+      },
+    });
   } catch (error) {
-    console.error('Erro ao buscar planos:', error);
-    return NextResponse.json(
-      { error: 'Erro ao buscar planos' },
-      { status: 500 }
-    );
+    console.error('Erro ao listar planos:', error);
+    return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { nome, precoMensal, maxEventos, maxJogos, maxParticipacoes, descricao } = body;
+    const user = await getFullUserFromRequest(request);
 
-    if (!nome || precoMensal === undefined) {
-      return NextResponse.json(
-        { error: 'Nome e preço são obrigatórios' },
-        { status: 400 }
-      );
+    if (!user) {
+      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
-    const plano = await db.plano.create({
+    const denied = await requirePermission(user.id, 'MANAGE_USERS');
+    if (denied) return denied;
+
+    const body = await request.json();
+    const { nome, descricao, precoMensal, maxEventos, maxJogos, maxVendedores, maxParticipacoes } = body;
+
+    if (!nome || precoMensal === undefined) {
+      return NextResponse.json({ error: 'Nome e preço são obrigatórios' }, { status: 400 });
+    }
+
+    const plano = await prisma.plano.create({
       data: {
         nome,
-        precoMensal,
+        descricao: descricao || null,
+        precoMensal: precoMensal,
         maxEventos: maxEventos || 10,
         maxJogos: maxJogos || 50,
+        maxVendedores: maxVendedores || 5,
         maxParticipacoes: maxParticipacoes || 1000,
-        descricao,
-      }
+      },
     });
 
-    return NextResponse.json(plano, { status: 201 });
+    return NextResponse.json({ success: true, data: plano }, { status: 201 });
   } catch (error) {
     console.error('Erro ao criar plano:', error);
-    return NextResponse.json(
-      { error: 'Erro ao criar plano' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
   }
 }

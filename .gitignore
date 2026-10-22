@@ -83,3 +83,7 @@ prisma/prisma/
 
 # Schema Postgres gerado no build (Vercel)
 prisma/schema.postgres.prisma
+
+# Logs e scripts manuais de teste (Windows)
+*.log
+Clear
